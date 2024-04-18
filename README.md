@@ -8,9 +8,7 @@ Short gif:
 
 Full video:
 
-![](docs/PeriodicTable.mp4)
-
-https://github.com/xiety/AnkiHistoryVisualization/assets/867537/640b9923-0387-4cd3-b590-01c25aebe377
+https://github.com/xiety/AnkiHistoryVisualization/assets/867537/e7b9115d-19c0-49d4-a59c-27e45d7d33bc
 
 Download PeriodicTable.mp4 video:
 

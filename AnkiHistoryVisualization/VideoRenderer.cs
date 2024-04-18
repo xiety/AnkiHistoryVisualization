@@ -15,7 +15,8 @@ public static class VideoRenderer
                     .FromPipeInput(new ImageSequencePipeSource(images))
                     .OutputToFile(videoFile, true, options => options
                         .WithVideoCodec(VideoCodec.LibX264)
-                        .WithConstantRateFactor(15)
+                        .ForcePixelFormat("yuv420p")
+                        .WithConstantRateFactor(14)
                         .WithFastStart());
 
         settings.ProcessSynchronously();

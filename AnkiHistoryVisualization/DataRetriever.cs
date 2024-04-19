@@ -6,17 +6,17 @@ namespace AnkiHistoryVisualization;
 
 public static class DataRetriever
 {
-    public static Card[] Retrieve(string database_path, string deck_name, int? card_type)
+    public static Card[] Retrieve(string databasePath, string deckName, int? cardType)
     {
-        using var db = new AnkiDbContext(database_path);
+        using var db = new AnkiDbContext(databasePath);
 
         var col = db.Col.First();
 
         var cards = db.Cards
-            .Where(a => a.Deck.Name == deck_name)
+            .Where(a => a.Deck.Name == deckName)
             .Where(a => a.Queue != 0 && a.Queue != -1)
             .Where(a => a.Data != "{}")
-            .Where(a => (card_type == null || a.Ord == card_type))
+            .Where(a => (cardType == null || a.Ord == cardType))
             .OrderBy(a => a.Id)
             .Include(a => a.Deck)
             .Include(a => a.Revlogs.Where(a => a.Type != 4))

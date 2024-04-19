@@ -4,28 +4,28 @@ namespace AnkiHistoryVisualization;
 
 public static class PeriodicTableImagesGenerator
 {
-    private static readonly Font font_number = new("Arial", 8);
-    private static readonly Font font_name = new("Arial", 8);
-    private static readonly Font font_title = new("Arial", 6);
+    private static readonly Font fontNumber = new("Arial", 8);
+    private static readonly Font fontName = new("Arial", 8);
+    private static readonly Font fontTitle = new("Arial", 6);
 
     private static readonly Color[] colors = [Color.Red, Color.Blue, Color.Green, Color.Yellow];
 
-    private static readonly Color color_stability = Color.Magenta;
-    private static readonly Color color_background = Color.FromArgb(20, 20, 20);
-    private static readonly Color color_cell = Color.FromArgb(60, 60, 60);
-    private static readonly Brush brush_shadow = Brushes.Black;
-    private static readonly Brush brush_text = Brushes.White;
-    private static readonly Brush brush_title = Brushes.White;
-    private static readonly Pen pen_percent = Pens.White;
-    private static readonly Pen pen_border = Pens.White;
+    private static readonly Color colorStabilityMax = Color.Magenta;
+    private static readonly Color colorBackground = Color.FromArgb(20, 20, 20);
+    private static readonly Color colorCell = Color.FromArgb(60, 60, 60);
+    private static readonly Brush brushShadow = Brushes.Black;
+    private static readonly Brush brushText = Brushes.White;
+    private static readonly Brush brushTitle = Brushes.White;
+    private static readonly Pen penPercent = Pens.White;
+    private static readonly Pen penBorder = Pens.White;
 
-    private static readonly int required_stability = 90;
-    private static readonly int frames_per_day = 4;
-    private static readonly int offset_y = 14;
-    private static readonly int margin = 2;
-    private static readonly int box_size = 30;
-    private static readonly int bottom_gap = 10;
-    private static readonly int gap = 4;
+    private const int requiredStability = 90;
+    private const int framesPerDay = 4;
+    private const int offsetY = 14;
+    private const int margin = 2;
+    private const int boxSize = 30;
+    private const int bottomGap = 10;
+    private const int gap = 4;
 
     private static readonly StringFormat stringFormatCenter = new()
     {
@@ -35,22 +35,22 @@ public static class PeriodicTableImagesGenerator
 
     public static IEnumerable<Bitmap> Generate(Position[] positions, Card[] lines)
     {
-        var min_date = lines.SelectMany(a => a.Revlogs.Select(b => b.Date)).Min();
-        var max_date = lines.SelectMany(a => a.Revlogs.Select(b => b.Date)).Max();
+        var minDate = lines.SelectMany(a => a.Revlogs.Select(b => b.Date)).Min();
+        var maxDate = lines.SelectMany(a => a.Revlogs.Select(b => b.Date)).Max();
 
-        var width = margin + (positions.Max(a => a.X) * (gap + box_size));
-        var height = offset_y + margin + (positions.Max(a => a.Y) * (gap + box_size)) + bottom_gap;
+        var width = margin + (positions.Max(a => a.X) * (gap + boxSize));
+        var height = offsetY + margin + (positions.Max(a => a.Y) * (gap + boxSize)) + bottomGap;
 
-        foreach (var date in min_date.EnumerateToInclusive(max_date))
+        foreach (var date in minDate.EnumerateToInclusive(maxDate))
         {
-            foreach (var frame_inside_day in Enumerable.Range(0, frames_per_day))
+            foreach (var frameInsideDay in Enumerable.Range(0, framesPerDay))
             {
-                var fraction = frame_inside_day / (float)frames_per_day;
+                var fraction = frameInsideDay / (float)framesPerDay;
 
                 using var bitmap = new Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
                 using var g = Graphics.FromImage(bitmap);
 
-                DrawImage(g, lines, positions, min_date, date, fraction);
+                DrawImage(g, lines, positions, minDate, date, fraction);
 
                 yield return bitmap;
             }
@@ -59,100 +59,84 @@ public static class PeriodicTableImagesGenerator
         }
     }
 
-    private static void DrawImage(Graphics g, Card[] lines, Position[] positions, DateOnly min_date, DateOnly date, float fraction)
+    private static void DrawImage(Graphics g, Card[] lines, Position[] positions, DateOnly minDate, DateOnly date, float fraction)
     {
-        g.Clear(color_background);
+        g.Clear(colorBackground);
 
-        g.DrawString($"{date:yyyy.MM.dd}", font_title, brush_title, 1, 1);
+        g.DrawString($"{date:yyyy.MM.dd}", fontTitle, brushTitle, 1, 1);
 
         foreach (var pos in positions)
         {
-            var x = ((pos.X - 1) * (box_size + gap)) + margin;
-            var y = ((pos.Y - 1) * (box_size + gap)) + offset_y + (pos.Y > 7 ? bottom_gap : 0);
+            var x = ((pos.X - 1) * (boxSize + gap)) + margin;
+            var y = ((pos.Y - 1) * (boxSize + gap)) + offsetY + (pos.Y > 7 ? bottomGap : 0);
 
-            g.FillRectangle(brush_shadow, x + 3, y + 3, box_size, box_size);
+            g.FillRectangle(brushShadow, x + 3, y + 3, boxSize, boxSize);
 
             var card = lines.FirstOrDefault(a => a.Text == pos.Name);
 
             if (card is not null)
             {
-                var revlog = card.Revlogs.Where(a => a.Date == date).FirstOrDefault();
-                var prev_revlog_or_null = card.Revlogs.Where(a => a.Date <= date).LastOrDefault()?.Date;
-                var next_revlog_or_null = card.Revlogs.Where(a => a.Date > date).FirstOrDefault()?.Date;
+                var revlog = card.Revlogs.FirstOrDefault(a => a.Date == date);
+                var revlogPrev = card.Revlogs.LastOrDefault(a => a.Date <= date);
+                var revlogNext = card.Revlogs.FirstOrDefault(a => a.Date > date);
 
-                var color_stability = CalcCurrentStabilityColor(card, prev_revlog_or_null, next_revlog_or_null);
+                var percentStability = CalcStabilityPercent(card, revlogPrev, revlogNext);
+                var colorStability = ColorUtils.Blend(colorCell, colorStabilityMax, percentStability);
 
                 if (revlog is not null)
                 {
                     var color = colors[revlog.Ease - 1];
-                    var faded = ColorUtils.Blend(color, color_stability, fraction);
-                    var current_brush = new SolidBrush(faded);
+                    var faded = ColorUtils.Blend(color, colorStability, fraction);
 
                     // review on this day
-                    g.FillRectangle(current_brush, x, y, box_size, box_size);
+                    g.FillRectangle(new SolidBrush(faded), x, y, boxSize, boxSize);
                 }
                 else
                 {
                     // stability if no review
-                    g.FillRectangle(new SolidBrush(color_stability), x, y, box_size, box_size);
+                    g.FillRectangle(new SolidBrush(colorStability), x, y, boxSize, boxSize);
                 }
 
                 // progress to next review
-                var percent = CalcPercent(min_date, date, fraction, card, prev_revlog_or_null, next_revlog_or_null);
-                g.DrawLine(pen_percent, x + 2, y + box_size - 2, x + 2 + (percent * (box_size - 4)), y + box_size - 2);
+                var percent = CalcPercentToNextReview(minDate, date, fraction, card, revlogPrev, revlogNext);
+                g.DrawLine(penPercent, x + 2, y + boxSize - 2, x + 2 + (percent * (boxSize - 4)), y + boxSize - 2);
             }
             else
             {
                 // not yet studied elements
-                g.FillRectangle(new SolidBrush(color_cell), x, y, box_size, box_size);
+                g.FillRectangle(new SolidBrush(colorCell), x, y, boxSize, boxSize);
             }
 
-            DrawCell(g, x, y, pos.Number, pos.Name);
+            DrawBox(g, x, y, pos.Number, pos.Name);
         }
     }
 
-    private static void DrawCell(Graphics g, int x, int y, int number, string name)
+    private static void DrawBox(Graphics g, int x, int y, int number, string name)
     {
-        g.DrawString($"{number}", font_number, brush_text, new RectangleF(x, y + 1, box_size, (box_size / 2) - 1), stringFormatCenter);
-        g.DrawString(name, font_name, brush_text, new RectangleF(x, y + (box_size / 2), box_size, (box_size / 2) - 3), stringFormatCenter);
-        g.DrawRectangle(pen_border, x, y, box_size, box_size);
+        g.DrawString($"{number}", fontNumber, brushText, new RectangleF(x, y + 1, boxSize, (boxSize / 2) - 1), stringFormatCenter);
+        g.DrawString(name, fontName, brushText, new RectangleF(x, y + (boxSize / 2), boxSize, (boxSize / 2) - 3), stringFormatCenter);
+        g.DrawRectangle(penBorder, x, y, boxSize, boxSize);
     }
 
-    private static float CalcPercent(DateOnly min_date, DateOnly date, float fraction, Card card, DateOnly? prev_revlog_or_null, DateOnly? next_revlog_or_null)
+    private static float CalcPercentToNextReview(DateOnly minDate, DateOnly date, float fraction, Card card, Revlog? revlogPrev, Revlog? revlogNext)
     {
-        var percent = 0.0f;
+        var datePrev = revlogPrev is not null ? revlogPrev.Date : minDate;
+        var dateNext = revlogNext is not null ? revlogNext.Date : card.Due;
 
-        if (prev_revlog_or_null is DateOnly prev_revlog)
-        {
-            percent = next_revlog_or_null is DateOnly next_revlog
-                ? (float)(date.DayNumber - prev_revlog.DayNumber + fraction) / (next_revlog.DayNumber - prev_revlog.DayNumber)
-                : (float)(date.DayNumber - prev_revlog.DayNumber + fraction) / (card.Due.DayNumber - prev_revlog.DayNumber);
-        }
-        else if (next_revlog_or_null is DateOnly next_revlog)
-        {
-            percent = (float)(date.DayNumber - min_date.DayNumber + fraction) / (next_revlog.DayNumber - min_date.DayNumber);
-        }
+        var percent = (date.DayNumber - datePrev.DayNumber + fraction) / (float)(dateNext.DayNumber - datePrev.DayNumber);
 
-        if (percent > 1f)
-            percent = 1f;
-
-        return percent;
+        return Math.Clamp(percent, 0f, 1f);
     }
 
-    private static Color CalcCurrentStabilityColor(Card card, DateOnly? prev_revlog_or_null, DateOnly? next_revlog_or_null)
+    private static float CalcStabilityPercent(Card card, Revlog? revlogPrev, Revlog? revlogNext)
     {
-        var current_stability = 0;
+        if (revlogPrev is null)
+            return 0;
 
-        if (prev_revlog_or_null is DateOnly prev_revlog)
-        {
-            current_stability = next_revlog_or_null is DateOnly next_revlog
-                ? next_revlog.DayNumber - prev_revlog.DayNumber
-                : card.Due.DayNumber - prev_revlog.DayNumber;
-        }
+        var dateNext = revlogNext is not null ? revlogNext.Date : card.Due;
+        var stability = dateNext.DayNumber - revlogPrev.Date.DayNumber;
 
-        var percent = Math.Min(required_stability, current_stability) / (float)required_stability;
-
-        return ColorUtils.Blend(color_cell, color_stability, percent);
+        return Math.Min(requiredStability, stability) / (float)requiredStability;
     }
 }
 

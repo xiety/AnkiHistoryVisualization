@@ -24,17 +24,17 @@ public static class VideoRenderer
 
     public static void ToImages(string folder, IEnumerable<Bitmap> images)
     {
-        var image_index = 0;
+        var imageIndex = 0;
 
         foreach (var image in images)
         {
-            image.Save(Path.Combine(folder, $"{image_index:00000}.png"), ImageFormat.Png);
-            image_index++;
+            image.Save(Path.Combine(folder, $"{imageIndex:00000}.png"), ImageFormat.Png);
+            imageIndex++;
         }
     }
 }
 
-file class ImageSequencePipeSource(IEnumerable<Bitmap> images) : IPipeSource
+file sealed class ImageSequencePipeSource(IEnumerable<Bitmap> images) : IPipeSource
 {
     public string GetStreamArguments()
         => "-f image2pipe";
@@ -43,7 +43,7 @@ file class ImageSequencePipeSource(IEnumerable<Bitmap> images) : IPipeSource
     {
         foreach (var image in images)
         {
-            image.Save(outputStream, ImageFormat.Png);
+            image.Save(outputStream, ImageFormat.Bmp);
             await outputStream.FlushAsync(cancellationToken);
         }
     }

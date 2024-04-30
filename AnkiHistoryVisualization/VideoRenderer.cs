@@ -9,10 +9,10 @@ namespace AnkiHistoryVisualization;
 
 public static class VideoRenderer
 {
-    public static void ToVideo(string videoFile, IEnumerable<Bitmap> images)
+    public static void ToVideo(string videoFile, float fps, IEnumerable<Bitmap> images)
     {
         var settings = FFMpegArguments
-                    .FromPipeInput(new ImageSequencePipeSource(images))
+                    .FromPipeInput(new ImageSequencePipeSource(images, fps))
                     .OutputToFile(videoFile, true, options => options
                         .WithVideoCodec(VideoCodec.LibX264)
                         .ForcePixelFormat("yuv420p")
@@ -34,16 +34,16 @@ public static class VideoRenderer
     }
 }
 
-file sealed class ImageSequencePipeSource(IEnumerable<Bitmap> images) : IPipeSource
+file sealed class ImageSequencePipeSource(IEnumerable<Bitmap> images, float fps) : IPipeSource
 {
     public string GetStreamArguments()
-        => "-f image2pipe";
+        => FormattableString.Invariant($"-f image2pipe -r {fps:0.00}");
 
     public async Task WriteAsync(Stream outputStream, CancellationToken cancellationToken)
     {
         foreach (var image in images)
         {
-            image.Save(outputStream, ImageFormat.Bmp);
+            image.Save(outputStream, ImageFormat.Png);
             await outputStream.FlushAsync(cancellationToken);
         }
     }

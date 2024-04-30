@@ -9,4 +9,4 @@ var positions = CsvUtils.Load<Position>(positions_file);
 var data = DataRetriever.Retrieve(database_file, deck_name, card_type);
 var images_enumerable = PeriodicTableImagesGenerator.Generate(positions, data);
 
-VideoRenderer.ToVideo(@"PeriodicTable.mp4", images_enumerable);
+VideoRenderer.ToVideo(@"PeriodicTable.mp4", 25, images_enumerable);

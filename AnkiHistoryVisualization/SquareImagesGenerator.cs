@@ -2,7 +2,7 @@
 
 namespace AnkiHistoryVisualization;
 
-public static class PeriodicTableImagesGenerator
+public static class SquareImagesGenerator
 {
     private static readonly Font fontNumber = new("Arial", 8);
     private static readonly Font fontName = new("Arial", 8);
@@ -22,10 +22,8 @@ public static class PeriodicTableImagesGenerator
     private const int requiredStability = 90;
     private const int framesPerDay = 4;
     private const int offsetY = 14;
-    private const int margin = 2;
-    private const int boxSize = 30;
-    private const int bottomGap = 10;
-    private const int gap = 4;
+    private const int boxSize = 10;
+    private const int gap = 0;
 
     private static readonly StringFormat stringFormatCenter = new()
     {
@@ -33,13 +31,18 @@ public static class PeriodicTableImagesGenerator
         LineAlignment = StringAlignment.Center
     };
 
-    public static IEnumerable<Bitmap> Generate(Position[] positions, Card[] cards)
+    public static IEnumerable<Bitmap> Generate(Card[] cards)
     {
+        cards = cards.OrderBy(a => a.Revlogs.Min(b => b.Date)).ToArray();
+
         var minDate = cards.SelectMany(a => a.Revlogs.Select(b => b.Date)).Min();
         var maxDate = cards.SelectMany(a => a.Revlogs.Select(b => b.Date)).Max();
 
-        var width = margin + (positions.Max(a => a.X) * (gap + boxSize));
-        var height = offsetY + margin + (positions.Max(a => a.Y) * (gap + boxSize)) + bottomGap;
+        var numberHorizontal = (int)Math.Ceiling(1.5 * Math.Sqrt(cards.Length));
+        var numberVertical = (int)Math.Ceiling(cards.Length / (float)numberHorizontal);
+
+        var width = (numberHorizontal * boxSize + (numberHorizontal - 1) * gap + 2) & ~1;
+        var height = (offsetY + numberVertical * boxSize + (numberVertical - 1) * gap + 2) & ~1;
 
         foreach (var date in minDate.EnumerateToInclusive(maxDate))
         {
@@ -50,7 +53,7 @@ public static class PeriodicTableImagesGenerator
                 using var bitmap = new Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
                 using var g = Graphics.FromImage(bitmap);
 
-                DrawImage(g, cards, positions, minDate, date, fraction);
+                DrawImage(g, cards, minDate, date, fraction, numberHorizontal);
 
                 yield return bitmap;
             }
@@ -59,63 +62,50 @@ public static class PeriodicTableImagesGenerator
         }
     }
 
-    private static void DrawImage(Graphics g, Card[] cards, Position[] positions, DateOnly minDate, DateOnly date, float fraction)
+    private static void DrawImage(Graphics g, Card[] cards, DateOnly minDate, DateOnly date, float fraction, int numberHorizontal)
     {
         g.Clear(colorBackground);
 
         g.DrawString($"{date:yyyy.MM.dd}", fontTitle, brushTitle, 1, 1);
 
-        foreach (var pos in positions)
+        var index = 0;
+
+        foreach (var card in cards)
         {
-            var x = ((pos.X - 1) * (boxSize + gap)) + margin;
-            var y = ((pos.Y - 1) * (boxSize + gap)) + offsetY + (pos.Y > 7 ? bottomGap : 0);
+            var x = (index % numberHorizontal) * (boxSize + gap);
+            var y = offsetY + (index / numberHorizontal) * (boxSize + gap);
 
             g.FillRectangle(brushShadow, x + 3, y + 3, boxSize, boxSize);
 
-            var card = cards.FirstOrDefault(a => a.Text == pos.Name);
+            var revlog = card.Revlogs.FirstOrDefault(a => a.Date == date);
+            var revlogPrev = card.Revlogs.LastOrDefault(a => a.Date <= date);
+            var revlogNext = card.Revlogs.FirstOrDefault(a => a.Date > date);
 
-            if (card is not null)
+            var percentStability = CalcStabilityPercent(card, revlogPrev, revlogNext);
+            var colorStability = ColorUtils.Blend(colorCell, colorStabilityMax, percentStability);
+
+            if (revlog is not null)
             {
-                var revlog = card.Revlogs.FirstOrDefault(a => a.Date == date);
-                var revlogPrev = card.Revlogs.LastOrDefault(a => a.Date <= date);
-                var revlogNext = card.Revlogs.FirstOrDefault(a => a.Date > date);
+                var color = colors[revlog.Ease - 1];
+                var faded = ColorUtils.Blend(color, colorStability, fraction);
 
-                var percentStability = CalcStabilityPercent(card, revlogPrev, revlogNext);
-                var colorStability = ColorUtils.Blend(colorCell, colorStabilityMax, percentStability);
-
-                if (revlog is not null)
-                {
-                    var color = colors[revlog.Ease - 1];
-                    var faded = ColorUtils.Blend(color, colorStability, fraction);
-
-                    // review on this day
-                    g.FillRectangle(new SolidBrush(faded), x, y, boxSize, boxSize);
-                }
-                else
-                {
-                    // stability if no review
-                    g.FillRectangle(new SolidBrush(colorStability), x, y, boxSize, boxSize);
-                }
-
-                // progress to next review
-                var percent = CalcPercentToNextReview(minDate, date, fraction, card, revlogPrev, revlogNext);
-                g.DrawLine(penPercent, x + 2, y + boxSize - 2, x + 2 + (percent * (boxSize - 4)), y + boxSize - 2);
+                // review on this day
+                g.FillRectangle(new SolidBrush(faded), x, y, boxSize, boxSize);
             }
             else
             {
-                // not yet studied elements
-                g.FillRectangle(new SolidBrush(colorCell), x, y, boxSize, boxSize);
+                // stability if no review
+                g.FillRectangle(new SolidBrush(colorStability), x, y, boxSize, boxSize);
             }
 
-            DrawBox(g, x, y, pos.Number, pos.Name);
-        }
-    }
+            // progress to next review
+            var percent = CalcPercentToNextReview(minDate, date, fraction, card, revlogPrev, revlogNext);
+            g.DrawLine(penPercent, x + 2, y + boxSize - 2, x + 2 + (percent * (boxSize - 4)), y + boxSize - 2);
 
-    private static void DrawBox(Graphics g, int x, int y, int number, string name)
-    {
-        g.DrawString($"{number}", fontNumber, brushText, new RectangleF(x, y + 1, boxSize, (boxSize / 2) - 1), stringFormatCenter);
-        g.DrawString(name, fontName, brushText, new RectangleF(x, y + (boxSize / 2), boxSize, (boxSize / 2) - 3), stringFormatCenter);
-        g.DrawRectangle(penBorder, x, y, boxSize, boxSize);
+            g.DrawRectangle(penBorder, x, y, boxSize, boxSize);
+
+            index++;
+        }
     }
 
     private static float CalcPercentToNextReview(DateOnly minDate, DateOnly date, float fraction, Card card, Revlog? revlogPrev, Revlog? revlogNext)
@@ -139,5 +129,3 @@ public static class PeriodicTableImagesGenerator
         return Math.Min(requiredStability, stability) / (float)requiredStability;
     }
 }
-
-public record Position(int Number, string Name, int X, int Y);

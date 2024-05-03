@@ -7,9 +7,9 @@ public abstract class BaseImageGenerator<TContext>(int framesPerDay, Color color
     private static readonly Font fontTitle = new("Arial", 6);
     private static readonly Brush brushTitle = Brushes.White;
 
-    protected abstract Size CalculateImageSize();
-    protected abstract SizeF DrawImage(Graphics g, Note[] notes, TContext context, DateOnly minDate, DateOnly date, float fraction);
     protected abstract TContext CreateContext(Note[] notes);
+    protected abstract Size CalculateImageSize(TContext context);
+    protected abstract void DrawImage(Graphics g, Note[] notes, TContext context, DateOnly minDate, DateOnly date, float fraction);
 
     protected abstract void DrawReview(Graphics g, float fraction, RectangleF cell, Revlog revlog, float percentStability);
     protected abstract void DrawStability(Graphics g, RectangleF cell, float percentStability);
@@ -19,11 +19,9 @@ public abstract class BaseImageGenerator<TContext>(int framesPerDay, Color color
     {
         var context = CreateContext(notes);
 
-        var imageSize = CalculateImageSize();
+        var imageSize = CalculateImageSize(context);
 
         imageSize = new(imageSize.Width & ~1, imageSize.Height & ~1);
-
-        var total = SizeF.Empty;
 
         var (minDate, maxDate) = DeckUtils.GetMinMaxDate(notes);
 
@@ -39,17 +37,13 @@ public abstract class BaseImageGenerator<TContext>(int framesPerDay, Color color
                 g.Clear(colorBackground);
                 g.DrawString($"{date:yyyy.MM.dd}", fontTitle, brushTitle, 15, 1);
 
-                var size = DrawImage(g, notes, context, minDate, date, fraction);
-
-                total = new SizeF(MathF.Max(total.Width, size.Width), MathF.Max(total.Height, size.Height));
+                DrawImage(g, notes, context, minDate, date, fraction);
 
                 yield return bitmap;
             }
 
             Console.WriteLine(date);
         }
-
-        Console.WriteLine(total);
     }
 
     protected void DrawCard(Graphics g, DateOnly minDate, DateOnly date, float fraction, RectangleF cell, Card card, int requiredStability)

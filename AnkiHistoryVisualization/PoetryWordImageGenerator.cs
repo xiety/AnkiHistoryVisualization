@@ -5,7 +5,7 @@ using Dic = System.Collections.Generic.Dictionary<AnkiHistoryVisualization.Note,
 
 namespace AnkiHistoryVisualization;
 
-public class PoetryWordImageGenerator() : BaseImageGenerator<Dic>(framesPerDay: 10, colorBackground)
+public class PoetryWordImageGenerator(int columns) : BaseImageGenerator<PoetryWordContext>(framesPerDay: 4, colorBackground)
 {
     private static readonly Font font = new("Verdana", 9);
 
@@ -16,38 +16,104 @@ public class PoetryWordImageGenerator() : BaseImageGenerator<Dic>(framesPerDay: 
     private static readonly Pen penPercent = Pens.White;
     private static readonly Pen penOutline = new(Color.Black, 2);
 
-    private const int requiredStability = 30;
+    private const int requiredStability = 60;
     private const int rowHeight = 16;
     private const int offsetY = 14;
     private const int margin = 2;
     private const int gap = 1;
+    private const int columnGap = 2;
 
-    private readonly MethodCache<string, int> measureCache = new();
+    protected override Size CalculateImageSize(PoetryWordContext context)
+        => context.ImageSize;
 
-    protected override Size CalculateImageSize()
-        //=> new(368 + 2, 610 + 2); //hamlet
-        //=> new(272, 2174); //onegin
-        => new(320, 2396); //dante
-
-    protected override Dic CreateContext(Note[] notes)
-        => notes.ToDictionary(a => a, a => ConvertNote(a).ToArray());
-
-    protected override SizeF DrawImage(Graphics g, Note[] notes, Dic context, DateOnly minDate, DateOnly date, float fraction)
+    protected override PoetryWordContext CreateContext(Note[] notes)
     {
-        var total = SizeF.Empty;
+        var converted = notes.ToDictionary(a => a, a => ConvertNote(a).ToArray());
 
         var stringFormat = new StringFormat(StringFormat.GenericTypographic);
         stringFormat.FormatFlags |= StringFormatFlags.MeasureTrailingSpaces;
 
-        var y = (float)offsetY;
+        var columnWidth = 0;
+        var rows = (converted.Count + columns - 1) / columns;
+        var widths = new Dictionary<string, int>();
+        var positions = new Dictionary<(Note, int), Rectangle>();
 
-        foreach (var (note, words) in context)
+        using var bitmap = new Bitmap(1, 1, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+
+        using (var g = Graphics.FromImage(bitmap))
         {
-            var x = (float)margin;
+            foreach (var (note, words) in converted)
+            {
+                var x = 0;
+
+                foreach (var word in words)
+                {
+                    if (!widths.TryGetValue(word.Text, out var wordWidth))
+                    {
+                        wordWidth = Measure(g, stringFormat, word.Text);
+                        widths.Add(word.Text, wordWidth);
+                    }
+
+                    x += wordWidth;
+
+                    if (columnWidth < x)
+                        columnWidth = x;
+                }
+            }
+        }
+
+        var total = new Size(margin * 2 + columns * (columnWidth + columnGap), offsetY + margin * 2 + rows * (rowHeight + gap));
+
+        var bitmapText = new Bitmap(total.Width, total.Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+
+        using (var g = Graphics.FromImage(bitmapText))
+        {
+            var index = 0;
+
+            foreach (var (note, words) in converted)
+            {
+                var row = index % rows;
+                var column = index / rows;
+
+                var x = margin + column * (columnWidth + columnGap);
+                var y = offsetY + row * (rowHeight + gap);
+
+                var wordIndex = 0;
+
+                foreach (var word in words)
+                {
+                    var wordWidth = widths[word.Text];
+
+                    g.DrawStringOutlined(word.Text, font, Brushes.White, penOutline, new PointF(x + 2, y), stringFormat);
+
+                    positions.Add((note, wordIndex), new(x, y, wordWidth - 1, rowHeight));
+
+                    x += wordWidth;
+
+                    wordIndex++;
+                }
+
+                index++;
+            }
+        }
+
+        return new(total, columnWidth, converted, positions, bitmapText);
+    }
+
+    protected override void DrawImage(Graphics g, Note[] notes, PoetryWordContext context, DateOnly minDate, DateOnly date, float fraction)
+    {
+        var stringFormat = new StringFormat(StringFormat.GenericTypographic);
+        stringFormat.FormatFlags |= StringFormatFlags.MeasureTrailingSpaces;
+
+        var index = 0;
+
+        foreach (var (note, words) in context.Converted)
+        {
+            var wordIndex = 0;
 
             foreach (var word in words)
             {
-                var wordWidth = measureCache.Get(word.Text, a => Measure(g, stringFormat, a));
+                var cell = context.Positions[(note, wordIndex)];
 
                 if (word.Cloze > 0)
                 {
@@ -55,25 +121,17 @@ public class PoetryWordImageGenerator() : BaseImageGenerator<Dic>(framesPerDay: 
 
                     if (card is not null)
                     {
-                        DrawCard(g, minDate, date, fraction, new(x, y, wordWidth - 1, rowHeight), card, requiredStability);
+                        DrawCard(g, minDate, date, fraction, cell, card, requiredStability);
                     }
                 }
 
-                g.DrawStringOutlined(word.Text, font, Brushes.White, penOutline, new PointF(x + 2, y), stringFormat);
-
-                x += wordWidth;
-
-                if (total.Width < x)
-                    total = total with { Width = x };
+                wordIndex++;
             }
 
-            y += rowHeight + gap;
-
-            if (total.Height < y)
-                total = total with { Height = y };
+            index++;
         }
 
-        return total;
+        g.DrawImage(context.Image, 0, 0);
     }
 
     private static int Measure(Graphics g, StringFormat stringFormat, string text)
@@ -100,17 +158,16 @@ public class PoetryWordImageGenerator() : BaseImageGenerator<Dic>(framesPerDay: 
         g.DrawLine(penPercent, cell.Left, cell.Bottom, cell.Left + (percent * cell.Width), cell.Bottom);
     }
 
-    private static List<WordInfo> GroupSiblings(List<WordInfo> acc, WordInfo next)
+    private static List<WordInfo> GroupSiblings(List<WordInfo> acc, WordInfo item)
     {
-        if (next.Cloze != 0 || !acc.Any())
-        {
-            acc.Add(next);
-        }
-        else
-        {
-            var last = acc.Last();
-            acc[^1] = new (last.Cloze, last.Text + next.Text);
-        }
+        var last = acc.LastOrDefault();
+
+        if (last is not null && last.Cloze == 0)
+            acc[^1] = new(item.Cloze, last.Text + item.Text);
+        else if (item.Cloze != 0 || acc.Count == 0)
+            acc.Add(item);
+        else if (last is not null)
+            acc[^1] = new(last.Cloze, last.Text + item.Text);
 
         return acc;
     }
@@ -153,3 +210,4 @@ public static partial class Regs
 }
 
 public record WordInfo(int Cloze, string Text);
+public record PoetryWordContext(Size ImageSize, int ColumnWidth, Dic Converted, Dictionary<(Note, int), Rectangle> Positions, Bitmap Image);

@@ -31,7 +31,7 @@ public class PeriodicTableImagesGenerator(Position[] positions) : BaseImageGener
         LineAlignment = StringAlignment.Center
     };
 
-    protected override Size CalculateImageSize()
+    protected override Size CalculateImageSize(object? context)
         => new(
                 margin + (positions.Max(a => a.X) * (gap + boxSize)),
                 offsetY + margin + (positions.Max(a => a.Y) * (gap + boxSize)) + bottomGap
@@ -39,10 +39,8 @@ public class PeriodicTableImagesGenerator(Position[] positions) : BaseImageGener
 
     protected override object? CreateContext(Note[] notes) => null;
 
-    protected override SizeF DrawImage(Graphics g, Note[] notes, object? context, DateOnly minDate, DateOnly date, float fraction)
+    protected override void DrawImage(Graphics g, Note[] notes, object? context, DateOnly minDate, DateOnly date, float fraction)
     {
-        var total = SizeF.Empty;
-
         foreach (var pos in positions)
         {
             var x = ((pos.X - 1) * (boxSize + gap)) + margin;
@@ -66,8 +64,6 @@ public class PeriodicTableImagesGenerator(Position[] positions) : BaseImageGener
 
             DrawBox(g, x, y, pos.Number, pos.Name);
         }
-
-        return total;
     }
 
     protected override void DrawReview(Graphics g, float fraction, RectangleF cell, Revlog revlog, float percentStability)

@@ -22,8 +22,12 @@ public class PoetryWordImageGenerator() : BaseImageGenerator<Dic>(framesPerDay: 
     private const int margin = 2;
     private const int gap = 1;
 
+    private readonly MethodCache<string, int> measureCache = new();
+
     protected override Size CalculateImageSize()
-        => new(368 + 2, 610 + 2);
+        //=> new(368 + 2, 610 + 2); //hamlet
+        //=> new(272, 2174); //onegin
+        => new(320, 2396); //dante
 
     protected override Dic CreateContext(Note[] notes)
         => notes.ToDictionary(a => a, a => ConvertNote(a).ToArray());
@@ -43,7 +47,7 @@ public class PoetryWordImageGenerator() : BaseImageGenerator<Dic>(framesPerDay: 
 
             foreach (var word in words)
             {
-                var wordWidth = MathF.Ceiling(g.MeasureSize(word.Text, font, stringFormat).Width) + 5;
+                var wordWidth = measureCache.Get(word.Text, a => Measure(g, stringFormat, a));
 
                 if (word.Cloze > 0)
                 {
@@ -51,7 +55,7 @@ public class PoetryWordImageGenerator() : BaseImageGenerator<Dic>(framesPerDay: 
 
                     if (card is not null)
                     {
-                        DrawCard(g, minDate, date, fraction, new(x, y, wordWidth, rowHeight), card, requiredStability);
+                        DrawCard(g, minDate, date, fraction, new(x, y, wordWidth - 1, rowHeight), card, requiredStability);
                     }
                 }
 
@@ -71,6 +75,9 @@ public class PoetryWordImageGenerator() : BaseImageGenerator<Dic>(framesPerDay: 
 
         return total;
     }
+
+    private static int Measure(Graphics g, StringFormat stringFormat, string text)
+        => (int)MathF.Ceiling(g.MeasureSize(text, font, stringFormat).Width) + 5;
 
     protected override void DrawReview(Graphics g, float fraction, RectangleF cell, Revlog revlog, float percentStability)
     {
@@ -113,11 +120,11 @@ public class PoetryWordImageGenerator() : BaseImageGenerator<Dic>(framesPerDay: 
 
     private static IEnumerable<WordInfo> ParseNote(Note note)
     {
-        var matchDiv = Regex.Match(note.Text, @"<div[^>]*>\s*\d+\.\s*(.*?)<\/div>(?!.*<div)", RegexOptions.Singleline | RegexOptions.RightToLeft);
+        var matchDiv = Regs.RegexDiv().Match(note.Text);
         var text = matchDiv.Groups[1].Value;
 
         var parsedElements = new List<(int, string)>();
-        var matches = Regex.Matches(text, @"(?<cloze>\{\{c(?<number>\d+)::(?<text>.*?)\}\})|(?<plainText>[^{}]+)");
+        var matches = Regs.RegexCloze().Matches(text);
 
         foreach (var match in matches.Cast<Match>())
         {
@@ -134,6 +141,15 @@ public class PoetryWordImageGenerator() : BaseImageGenerator<Dic>(framesPerDay: 
             }
         }
     }
+}
+
+public static partial class Regs
+{
+    [GeneratedRegex(@"<div[^>]*>\s*\d+\.\s*(.*?)<\/div>(?!.*<div)", RegexOptions.Singleline | RegexOptions.RightToLeft)]
+    public static partial Regex RegexDiv();
+
+    [GeneratedRegex(@"(?<cloze>\{\{c(?<number>\d+)::(?<text>.*?)\}\})|(?<plainText>[^{}]+)")]
+    public static partial Regex RegexCloze();
 }
 
 public record WordInfo(int Cloze, string Text);

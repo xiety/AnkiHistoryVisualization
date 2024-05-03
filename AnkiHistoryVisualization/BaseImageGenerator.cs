@@ -20,6 +20,9 @@ public abstract class BaseImageGenerator<TContext>(int framesPerDay, Color color
         var context = CreateContext(notes);
 
         var imageSize = CalculateImageSize();
+
+        imageSize = new(imageSize.Width & ~1, imageSize.Height & ~1);
+
         var total = SizeF.Empty;
 
         var (minDate, maxDate) = DeckUtils.GetMinMaxDate(notes);

@@ -1,4 +1,6 @@
-﻿using AnkiDatabase;
+﻿using System.Linq.Expressions;
+
+using AnkiDatabase;
 
 using Microsoft.EntityFrameworkCore;
 
@@ -6,44 +8,54 @@ namespace AnkiHistoryVisualization;
 
 public static class DataRetriever
 {
-    public static Card[] Retrieve(string databasePath, string deckName, int? cardType)
+    public static Note[] Retrieve(string databasePath, string deckName, int? cardType)
     {
         using var db = new AnkiDbContext(databasePath);
 
         var col = db.Col.First();
 
-        var cards = db.Cards
-            .Where(a => a.Deck.Name == deckName)
-            .Where(a => a.Queue != 0 && a.Queue != -1)
-            .Where(a => a.Data != "{}")
-            .Where(a => (cardType == null || a.Ord == cardType))
-            .OrderBy(a => a.Id)
-            .Include(a => a.Deck)
-            .Include(a => a.Revlogs.Where(a => a.Type != 4))
-            .Include(a => a.Note)
-            .OrderBy(a => a.Id)
-            .ToArray(); //materialize
+        Expression<Func<CardTable, bool>> filter = a => a.Deck.Name.StartsWith(deckName) && a.Deck.Name.EndsWith(deckName)
+                                                     && a.Queue != 0 && a.Queue != -1
+                                                     && a.Data != "{}"
+                                                     && (cardType == null || a.Ord == cardType);
 
-        var lines = cards
-            .Select(card =>
+        var query = db.Notes
+            .Include(a => a.Cards.AsQueryable().Where(filter).OrderBy(b => b.Ord))
+            .ThenInclude(a => a.Deck)
+            .Include(a => a.Cards)
+            .ThenInclude(a => a.Revlogs.Where(b => b.Type != 4))
+            .Where(a => a.Cards.AsQueryable().Any(filter))
+            .OrderBy(a => a.Id);
+
+        var sql = query.ToQueryString();
+
+        var notes = query.ToArray(); //materialize
+
+        var data = notes
+            .Select(note =>
             {
-                var fields = card.Note.Flds.Split("\u001f");
+                var fields = note.Flds.Split("\u001f");
                 var number = fields[0];
                 var full = fields[1];
 
-                var revlogs = card.Revlogs
-                    .GroupBy(a => ConvertDateWithNight(a.Id, 4))
-                    .Select(a => new Revlog(a.Key, (int)a.MinBy(a => a.Id)!.Ease))
-                    .OrderBy(a => a.Date)
-                    .ToArray();
+                var cards = note.Cards.Select(card =>
+                {
+                    var due = DateOnly.FromDateTime(col.Crt.AddDays(card.Due));
 
-                var due = DateOnly.FromDateTime(col.Crt.AddDays(card.Due));
+                    var revlogs = card.Revlogs
+                        .GroupBy(a => ConvertDateWithNight(a.Id, 4))
+                        .Select(a => new Revlog(a.Key, a.MinBy(a => a.Id)!.Ease))
+                        .OrderBy(a => a.Date)
+                        .ToArray();
 
-                return new Card(card.Id, number, full, due, revlogs);
+                    return new Card(card.Id, card.Ord, due, revlogs);
+                }).ToArray();
+
+                return new Note(note.Id, number, full, cards);
             })
             .ToArray();
 
-        return lines;
+        return data;
     }
 
     private static DateOnly ConvertDateWithNight(DateTime dateTime, int nextDayHour)
@@ -57,5 +69,6 @@ public static class DataRetriever
     }
 }
 
-public record Card(long CardId, string Number, string Text, DateOnly Due, Revlog[] Revlogs);
+public record Note(long NoteId, string Number, string Text, Card[] Cards);
+public record Card(long CardId, int CardType, DateOnly Due, Revlog[] Revlogs);
 public record Revlog(DateOnly Date, int Ease);

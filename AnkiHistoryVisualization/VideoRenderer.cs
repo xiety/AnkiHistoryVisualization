@@ -14,9 +14,9 @@ public static class VideoRenderer
         var settings = FFMpegArguments
                     .FromPipeInput(new ImageSequencePipeSource(images, fps))
                     .OutputToFile(videoFile, true, options => options
-                        .WithVideoCodec(VideoCodec.LibX264)
+                        .WithVideoCodec(VideoCodec.LibX265)
                         .ForcePixelFormat("yuv420p")
-                        .WithConstantRateFactor(14)
+                        .WithConstantRateFactor(0)
                         .WithFastStart());
 
         settings.ProcessSynchronously();
@@ -24,6 +24,9 @@ public static class VideoRenderer
 
     public static void ToImages(string folder, IEnumerable<Bitmap> images)
     {
+        if (!Directory.Exists(folder))
+            Directory.CreateDirectory(folder);
+
         var imageIndex = 0;
 
         foreach (var image in images)

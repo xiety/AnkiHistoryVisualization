@@ -4,8 +4,8 @@ namespace AnkiHistoryVisualization;
 
 public static class PeriodicTableImagesGenerator
 {
-    private static readonly Font fontNumber = new("Arial", 8);
-    private static readonly Font fontName = new("Arial", 8);
+    private static readonly Font fontNumber = new("Verdana", 8, FontStyle.Bold);
+    private static readonly Font fontName = new("Verdana", 8, FontStyle.Bold);
     private static readonly Font fontTitle = new("Arial", 6);
 
     private static readonly Color[] colors = [Color.Red, Color.Blue, Color.Green, Color.Yellow];
@@ -18,6 +18,7 @@ public static class PeriodicTableImagesGenerator
     private static readonly Brush brushTitle = Brushes.White;
     private static readonly Pen penPercent = Pens.White;
     private static readonly Pen penBorder = Pens.White;
+    private static readonly Pen penOutline = new(colorCell, 2);
 
     private const int requiredStability = 90;
     private const int framesPerDay = 4;
@@ -33,10 +34,9 @@ public static class PeriodicTableImagesGenerator
         LineAlignment = StringAlignment.Center
     };
 
-    public static IEnumerable<Bitmap> Generate(Position[] positions, Card[] cards)
+    public static IEnumerable<Bitmap> Generate(Position[] positions, Note[] notes)
     {
-        var minDate = cards.SelectMany(a => a.Revlogs.Select(b => b.Date)).Min();
-        var maxDate = cards.SelectMany(a => a.Revlogs.Select(b => b.Date)).Max();
+        var (minDate, maxDate) = DeckUtils.GetMinMaxDate(notes);
 
         var width = margin + (positions.Max(a => a.X) * (gap + boxSize));
         var height = offsetY + margin + (positions.Max(a => a.Y) * (gap + boxSize)) + bottomGap;
@@ -50,7 +50,7 @@ public static class PeriodicTableImagesGenerator
                 using var bitmap = new Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
                 using var g = Graphics.FromImage(bitmap);
 
-                DrawImage(g, cards, positions, minDate, date, fraction);
+                DrawImage(g, notes, positions, minDate, date, fraction);
 
                 yield return bitmap;
             }
@@ -59,7 +59,7 @@ public static class PeriodicTableImagesGenerator
         }
     }
 
-    private static void DrawImage(Graphics g, Card[] cards, Position[] positions, DateOnly minDate, DateOnly date, float fraction)
+    private static void DrawImage(Graphics g, Note[] notes, Position[] positions, DateOnly minDate, DateOnly date, float fraction)
     {
         g.Clear(colorBackground);
 
@@ -72,7 +72,7 @@ public static class PeriodicTableImagesGenerator
 
             g.FillRectangle(brushShadow, x + 3, y + 3, boxSize, boxSize);
 
-            var card = cards.FirstOrDefault(a => a.Text == pos.Name);
+            var card = notes.FirstOrDefault(a => a.Text == pos.Name)?.Cards.FirstOrDefault();
 
             if (card is not null)
             {
@@ -85,11 +85,11 @@ public static class PeriodicTableImagesGenerator
 
                 if (revlog is not null)
                 {
-                    var color = colors[revlog.Ease - 1];
-                    var faded = ColorUtils.Blend(color, colorStability, fraction);
+                    var revlogColor = colors[revlog.Ease - 1];
+                    var color = ColorUtils.Blend(revlogColor, colorStability, fraction);
 
                     // review on this day
-                    g.FillRectangle(new SolidBrush(faded), x, y, boxSize, boxSize);
+                    g.FillRectangle(new SolidBrush(color), x, y, boxSize, boxSize);
                 }
                 else
                 {
@@ -113,8 +113,8 @@ public static class PeriodicTableImagesGenerator
 
     private static void DrawBox(Graphics g, int x, int y, int number, string name)
     {
-        g.DrawString($"{number}", fontNumber, brushText, new RectangleF(x, y + 1, boxSize, (boxSize / 2) - 1), stringFormatCenter);
-        g.DrawString(name, fontName, brushText, new RectangleF(x, y + (boxSize / 2), boxSize, (boxSize / 2) - 3), stringFormatCenter);
+        g.DrawStringOutlined($"{number}", fontNumber, brushText, penOutline, new RectangleF(x, y + 1, boxSize, (boxSize / 2) - 1), stringFormatCenter);
+        g.DrawStringOutlined(name, fontName, brushText, penOutline, new RectangleF(x, y + (boxSize / 2), boxSize, (boxSize / 2) - 3), stringFormatCenter);
         g.DrawRectangle(penBorder, x, y, boxSize, boxSize);
     }
 

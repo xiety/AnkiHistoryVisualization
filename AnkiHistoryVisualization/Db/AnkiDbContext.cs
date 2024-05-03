@@ -25,7 +25,7 @@ public partial class AnkiDbContext(string filename) : DbContext
     {
         modelBuilder.Entity<ColTable>(entity =>
         {
-            entity.Property(e => e.Crt)
+            entity.Property(a => a.Crt)
                 .HasConversion(
                     v => ((DateTimeOffset)v).ToUnixTimeSeconds(),
                     v => DateTimeOffset.FromUnixTimeSeconds(v).ToLocalTime().DateTime);
@@ -33,18 +33,18 @@ public partial class AnkiDbContext(string filename) : DbContext
 
         modelBuilder.Entity<CardTable>(entity =>
         {
-            entity.HasOne(e => e.Deck).WithMany().HasForeignKey(a => a.Did);
-            entity.HasOne(e => e.Note).WithMany().HasForeignKey(a => a.Nid);
+            entity.HasOne(a => a.Deck).WithMany().HasForeignKey(a => a.Did);
+            entity.HasOne(a => a.Note).WithMany(a => a.Cards).HasForeignKey(a => a.Nid);
         });
 
         modelBuilder.Entity<RevlogTable>(entity =>
         {
-            entity.Property(e => e.Id)
+            entity.Property(a => a.Id)
                 .HasConversion(
                     v => ((DateTimeOffset)v).ToUnixTimeMilliseconds(),
                     v => DateTimeOffset.FromUnixTimeMilliseconds(v).ToLocalTime().DateTime);
 
-            entity.HasOne(e => e.Card).WithMany(a => a.Revlogs).HasForeignKey(a => a.Cid);
+            entity.HasOne(a => a.Card).WithMany(a => a.Revlogs).HasForeignKey(a => a.Cid);
         });
     }
 }
@@ -95,6 +95,8 @@ public partial class NoteTable
 {
     public long Id { get; set; }
     public string Flds { get; set; } = null!;
+
+    public ICollection<CardTable> Cards { get; set; } = default!;
 }
 
 [Table("revlog")]

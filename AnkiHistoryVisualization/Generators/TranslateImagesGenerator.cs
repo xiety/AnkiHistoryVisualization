@@ -86,7 +86,8 @@ public class TranslateImageGenerator() : BaseImageGenerator<TranslateContext>(fr
 
             if (card is not null)
             {
-                DrawCard(g, minDate, date, fraction, cell, card, requiredStability);
+                DrawCard(g, context, minDate, date, fraction, cell, note, card, requiredStability);
+                DrawCardPercent(g, context, minDate, date, fraction, cell, note, card, requiredStability);
             }
 
             index++;
@@ -98,7 +99,7 @@ public class TranslateImageGenerator() : BaseImageGenerator<TranslateContext>(fr
     private static int Measure(Graphics g, StringFormat stringFormat, string text)
         => (int)MathF.Ceiling(g.MeasureSize(text, font, stringFormat).Width) + 5;
 
-    protected override void DrawReview(Graphics g, float fraction, RectangleF cell, Revlog revlog, float percentStability)
+    protected override void DrawReview(Graphics g, TranslateContext context, Note note, Card card, float fraction, RectangleF cell, Revlog revlog, float percentStability)
     {
         var colorStability = ColorUtils.Blend(colorCell, colorStabilityMax, percentStability);
         var revlogColor = colors[revlog.Ease - 1];
@@ -108,13 +109,13 @@ public class TranslateImageGenerator() : BaseImageGenerator<TranslateContext>(fr
         g.FillRectangle(new SolidBrush(color), cell);
     }
 
-    protected override void DrawStability(Graphics g, RectangleF cell, float percentStability)
+    protected override void DrawStability(Graphics g, TranslateContext context, Note note, Card card, RectangleF cell, float percentStability)
     {
         var colorStability = ColorUtils.Blend(colorCell, colorStabilityMax, percentStability);
         g.FillRectangle(new SolidBrush(colorStability), cell);
     }
 
-    protected override void DrawPercent(Graphics g, RectangleF cell, float percent)
+    protected override void DrawPercent(Graphics g, TranslateContext context, Note note, Card card, RectangleF cell, int stabilityDays, float percent, bool isNew)
     {
         g.DrawLine(penPercent, cell.Left, cell.Bottom, cell.Left + (percent * cell.Width), cell.Bottom);
     }

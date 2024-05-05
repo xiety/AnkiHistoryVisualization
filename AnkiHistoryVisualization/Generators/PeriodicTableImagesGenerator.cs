@@ -50,11 +50,13 @@ public class PeriodicTableImagesGenerator(Position[] positions) : BaseImageGener
 
             g.FillRectangle(brushShadow, x + 3, y + 3, boxSize, boxSize);
 
-            var card = notes.FirstOrDefault(a => a.Text == pos.Name)?.Cards.FirstOrDefault();
+            var note = notes.FirstOrDefault(a => a.Text == pos.Name);
 
-            if (card is not null)
+            if (note is not null)
             {
-                DrawCard(g, minDate, date, fraction, cell, card, requiredStability);
+                var card = note.Cards.First();
+                DrawCard(g, null, minDate, date, fraction, cell, note, card, requiredStability);
+                DrawCardPercent(g, null, minDate, date, fraction, cell, note, card, requiredStability);
             }
             else
             {
@@ -66,7 +68,7 @@ public class PeriodicTableImagesGenerator(Position[] positions) : BaseImageGener
         }
     }
 
-    protected override void DrawReview(Graphics g, float fraction, RectangleF cell, Revlog revlog, float percentStability)
+    protected override void DrawReview(Graphics g, object? context, Note note, Card card, float fraction, RectangleF cell, Revlog revlog, float percentStability)
     {
         var colorStability = ColorUtils.Blend(colorCell, colorStabilityMax, percentStability);
 
@@ -77,13 +79,13 @@ public class PeriodicTableImagesGenerator(Position[] positions) : BaseImageGener
         g.FillRectangle(new SolidBrush(color), cell);
     }
 
-    protected override void DrawStability(Graphics g, RectangleF cell, float percentStability)
+    protected override void DrawStability(Graphics g, object? context, Note note, Card card, RectangleF cell, float percentStability)
     {
         var colorStability = ColorUtils.Blend(colorCell, colorStabilityMax, percentStability);
         g.FillRectangle(new SolidBrush(colorStability), cell);
     }
 
-    protected override void DrawPercent(Graphics g, RectangleF cell, float percent)
+    protected override void DrawPercent(Graphics g, object? context, Note note, Card card, RectangleF cell, int stabilityDays, float percent, bool isNew)
     {
         g.DrawLine(penPercent, cell.Left + 2, cell.Bottom - 2, cell.Left + 2 + (percent * (cell.Width - 4)), cell.Bottom - 2);
     }

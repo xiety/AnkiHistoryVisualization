@@ -5,7 +5,7 @@ using Dic = System.Collections.Generic.Dictionary<AnkiHistoryVisualization.Note,
 
 namespace AnkiHistoryVisualization;
 
-public class PoetryWordImageGenerator(int columns) : BaseImageGenerator<PoetryWordContext>(framesPerDay: 4, colorBackground)
+public class PoetryWordImageGenerator(int columns) : BaseImageGenerator<PoetryWordContext>(framesPerDay: 8, colorBackground)
 {
     private static readonly Font font = new("Verdana", 9);
 
@@ -18,7 +18,7 @@ public class PoetryWordImageGenerator(int columns) : BaseImageGenerator<PoetryWo
 
     private const int requiredStability = 60;
     private const int rowHeight = 16;
-    private const int offsetY = 14;
+    private const int offsetY = 12;
     private const int margin = 2;
     private const int gap = 1;
     private const int columnGap = 2;
@@ -121,7 +121,8 @@ public class PoetryWordImageGenerator(int columns) : BaseImageGenerator<PoetryWo
 
                     if (card is not null)
                     {
-                        DrawCard(g, minDate, date, fraction, cell, card, requiredStability);
+                        DrawCard(g, context, minDate, date, fraction, cell, note, card, requiredStability);
+                        DrawCardPercent(g, context, minDate, date, fraction, cell, note, card, requiredStability);
                     }
                 }
 
@@ -137,7 +138,7 @@ public class PoetryWordImageGenerator(int columns) : BaseImageGenerator<PoetryWo
     private static int Measure(Graphics g, StringFormat stringFormat, string text)
         => (int)MathF.Ceiling(g.MeasureSize(text, font, stringFormat).Width) + 5;
 
-    protected override void DrawReview(Graphics g, float fraction, RectangleF cell, Revlog revlog, float percentStability)
+    protected override void DrawReview(Graphics g, PoetryWordContext context, Note note, Card card, float fraction, RectangleF cell, Revlog revlog, float percentStability)
     {
         var colorStability = ColorUtils.Blend(colorBackground, colorStabilityMax, percentStability);
         var revlogColor = colors[revlog.Ease - 1];
@@ -147,13 +148,13 @@ public class PoetryWordImageGenerator(int columns) : BaseImageGenerator<PoetryWo
         g.FillRectangle(new SolidBrush(color), cell);
     }
 
-    protected override void DrawStability(Graphics g, RectangleF cell, float percentStability)
+    protected override void DrawStability(Graphics g, PoetryWordContext context, Note note, Card card, RectangleF cell, float percentStability)
     {
         var colorStability = ColorUtils.Blend(colorBackground, colorStabilityMax, percentStability);
         g.FillRectangle(new SolidBrush(colorStability), cell);
     }
 
-    protected override void DrawPercent(Graphics g, RectangleF cell, float percent)
+    protected override void DrawPercent(Graphics g, PoetryWordContext context, Note note, Card card, RectangleF cell, int stabilityDays, float percent, bool isNew)
     {
         g.DrawLine(penPercent, cell.Left, cell.Bottom, cell.Left + (percent * cell.Width), cell.Bottom);
     }

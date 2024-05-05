@@ -11,9 +11,9 @@ public abstract class BaseImageGenerator<TContext>(int framesPerDay, Color color
     protected abstract Size CalculateImageSize(TContext context);
     protected abstract void DrawImage(Graphics g, Note[] notes, TContext context, DateOnly minDate, DateOnly date, float fraction);
 
-    protected abstract void DrawReview(Graphics g, float fraction, RectangleF cell, Revlog revlog, float percentStability);
-    protected abstract void DrawStability(Graphics g, RectangleF cell, float percentStability);
-    protected abstract void DrawPercent(Graphics g, RectangleF cell, float percent);
+    protected abstract void DrawReview(Graphics g, TContext context, Note note, Card card, float fraction, RectangleF cell, Revlog revlog, float percentStability);
+    protected abstract void DrawStability(Graphics g, TContext context, Note note, Card card, RectangleF cell, float percentStability);
+    protected abstract void DrawPercent(Graphics g, TContext context, Note note, Card card, RectangleF cell, int stability, float percent, bool isNew);
 
     public virtual IEnumerable<Bitmap> Generate(Note[] notes)
     {
@@ -24,6 +24,8 @@ public abstract class BaseImageGenerator<TContext>(int framesPerDay, Color color
         imageSize = new(imageSize.Width & ~1, imageSize.Height & ~1);
 
         var (minDate, maxDate) = DeckUtils.GetMinMaxDate(notes);
+
+        maxDate = DateOnly.FromDateTime(DateTime.Now);
 
         foreach (var date in minDate.EnumerateToInclusive(maxDate))
         {
@@ -46,7 +48,7 @@ public abstract class BaseImageGenerator<TContext>(int framesPerDay, Color color
         }
     }
 
-    protected void DrawCard(Graphics g, DateOnly minDate, DateOnly date, float fraction, RectangleF cell, Card card, int requiredStability)
+    protected void DrawCard(Graphics g, TContext context, DateOnly minDate, DateOnly date, float fraction, RectangleF cell, Note note, Card card, int requiredStability)
     {
         var revlog = card.Revlogs.FirstOrDefault(a => a.Date == date);
         var revlogPrev = card.Revlogs.LastOrDefault(a => a.Date <= date);
@@ -55,13 +57,31 @@ public abstract class BaseImageGenerator<TContext>(int framesPerDay, Color color
         var percentStability = CalcStabilityPercent(card, revlogPrev, revlogNext, requiredStability);
 
         if (revlog is not null)
-            DrawReview(g, fraction, cell, revlog, percentStability);
+            DrawReview(g, context, note, card, fraction, cell, revlog, percentStability);
         else
-            DrawStability(g, cell, percentStability);
+            DrawStability(g, context, note, card, cell, percentStability);
 
+        var stabilityDays = CalcStabilityDays(minDate, date, card, revlogPrev, revlogNext);
+        var percent = CalcPercentToNextReview(minDate, date, fraction, card, revlogPrev, revlogNext);
+    }
+
+    protected void DrawCardPercent(Graphics g, TContext context, DateOnly minDate, DateOnly date, float fraction, RectangleF cell, Note note, Card card, int requiredStability)
+    {
+        var revlogPrev = card.Revlogs.LastOrDefault(a => a.Date <= date);
+        var revlogNext = card.Revlogs.FirstOrDefault(a => a.Date > date);
+
+        var stabilityDays = CalcStabilityDays(minDate, date, card, revlogPrev, revlogNext);
         var percent = CalcPercentToNextReview(minDate, date, fraction, card, revlogPrev, revlogNext);
 
-        DrawPercent(g, cell, percent);
+        DrawPercent(g, context, note, card, cell, stabilityDays, percent, isNew: revlogPrev is null);
+    }
+
+    protected static int CalcStabilityDays(DateOnly minDate, DateOnly date, Card card, Revlog? revlogPrev, Revlog? revlogNext)
+    {
+        var datePrev = revlogPrev is not null ? revlogPrev.Date : minDate;
+        var dateNext = revlogNext is not null ? revlogNext.Date : card.Due;
+
+        return dateNext.DayNumber - datePrev.DayNumber;
     }
 
     protected static float CalcPercentToNextReview(DateOnly minDate, DateOnly date, float fraction, Card card, Revlog? revlogPrev, Revlog? revlogNext)

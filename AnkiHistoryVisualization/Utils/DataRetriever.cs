@@ -1,4 +1,5 @@
 ﻿using System.Linq.Expressions;
+using System.Text.Json;
 
 using AnkiDatabase;
 
@@ -31,6 +32,8 @@ public static class DataRetriever
 
         var notes = query.ToArray(); //materialize
 
+        var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
         var data = notes
             .Select(note =>
             {
@@ -42,13 +45,16 @@ public static class DataRetriever
                 {
                     var due = DateOnly.FromDateTime(col.Crt.AddDays(card.Due));
 
+                    var data = JsonSerializer.Deserialize<DataInfo>(card.Data, jsonOptions)!;
+                    var difficulty = (data.D - 1.0f) / 9.0f;
+
                     var revlogs = card.Revlogs
                         .GroupBy(a => ConvertDateWithNight(a.Id, 4))
                         .Select(a => new Revlog(a.Key, a.MinBy(a => a.Id)!.Ease))
                         .OrderBy(a => a.Date)
                         .ToArray();
 
-                    return new Card(card.Id, card.Ord, due, revlogs);
+                    return new Card(card.Id, card.Ord, due, difficulty, revlogs);
                 }).ToArray();
 
                 return new Note(note.Id, number, full, cards);
@@ -67,8 +73,14 @@ public static class DataRetriever
 
         return dateOnly;
     }
+
+    public class DataInfo
+    {
+        public float S { get; set; }
+        public float D { get; set; }
+    }
 }
 
 public record Note(long NoteId, string Number, string Text, Card[] Cards);
-public record Card(long CardId, int CardType, DateOnly Due, Revlog[] Revlogs);
+public record Card(long CardId, int CardType, DateOnly Due, float Difficulty, Revlog[] Revlogs);
 public record Revlog(DateOnly Date, int Ease);

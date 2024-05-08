@@ -4,17 +4,18 @@ using System.Xml.Linq;
 
 namespace AnkiHistoryVisualization;
 
-public class MapImageGenerator(MapRegion[] regions) : BaseImageGenerator<MapContext>(framesPerDay: 2, colorBackground)
+public class MapImageGenerator(MapRegion[] regions) : BaseImageGenerator<MapContext>(framesPerDay: 3, colorBackground)
 {
     private static readonly Font font = new("Verdana", 9);
 
-    private static readonly Color[] colors = [Color.Red, Color.Blue, Color.Green, Color.Yellow];
+    private static readonly Color[] colorsReview = [Color.Red, Color.DodgerBlue, Color.Green, Color.Yellow];
 
     private static readonly Color colorCell = Color.FromArgb(60, 60, 60);
     private static readonly Color colorStabilityMax = Color.Magenta;
     private static readonly Color colorBackground = Color.FromArgb(0, 0, 0);
+    private static readonly Pen penOutline = new(colorCell, 2);
 
-    private const int requiredStability = 120;
+    private const int requiredStability = 150;
 
     private static readonly StringFormat stringFormatCenter = new()
     {
@@ -26,23 +27,19 @@ public class MapImageGenerator(MapRegion[] regions) : BaseImageGenerator<MapCont
         => new(730, (int)(730f * 9f / 16f));
 
     protected override MapContext CreateContext(Note[] notes)
-        => new(notes.ToDictionary(a => a.Number, ConvertNote));
+        => new(regions.ToDictionary(a => a.Name, ConvertNote));
 
-    private GraphicsPath ConvertNote(Note note)
-    {
-        var region = regions.First(a => a.Name == note.Number);
-        return SvgPathParser.Parse(region.Path, new(0.75f, 0.75f), new(-50, -10));
-    }
+    private GraphicsPath ConvertNote(MapRegion region)
+        => SvgPathParser.Parse(region.Path, new(0.75f, 0.75f), new(-50, -10));
 
     protected override void DrawImage(Graphics g, Note[] notes, MapContext context, DateOnly minDate, DateOnly date, float fraction)
     {
-        g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+        //g.InterpolationMode = InterpolationMode.HighQualityBicubic;
         g.SmoothingMode = SmoothingMode.HighQuality;
 
         foreach (var region in regions)
         {
             var graphicsPath = context.GraphicsPaths[region.Name];
-
             var note = notes.FirstOrDefault(a => a.Number == region.Name);
 
             if (note is not null)
@@ -50,19 +47,35 @@ public class MapImageGenerator(MapRegion[] regions) : BaseImageGenerator<MapCont
                 var card = note.Cards.First();
                 var calc = Calculate(minDate, date, fraction, card);
 
-                DrawReview(g, graphicsPath, calc);
+                DrawReview(g, graphicsPath, fraction, calc);
             }
             else
             {
                 g.FillPath(new SolidBrush(colorStabilityMax), graphicsPath);
-                g.DrawPath(Pens.White, graphicsPath);
             }
+
+            g.DrawPath(new Pen(Color.White, 1.5f), graphicsPath);
         }
 
         foreach (var region in regions)
         {
             var graphicsPath = context.GraphicsPaths[region.Name];
+            var note = notes.FirstOrDefault(a => a.Number == region.Name);
 
+            if (note is not null)
+            {
+                var card = note.Cards.First();
+                var calc = Calculate(minDate, date, fraction, card);
+
+                DrawName(g, graphicsPath, note, card, date, calc);
+            }
+        }
+
+        g.SmoothingMode = SmoothingMode.None;
+
+        foreach (var region in regions)
+        {
+            var graphicsPath = context.GraphicsPaths[region.Name];
             var note = notes.FirstOrDefault(a => a.Number == region.Name);
 
             if (note is not null)
@@ -75,28 +88,39 @@ public class MapImageGenerator(MapRegion[] regions) : BaseImageGenerator<MapCont
         }
     }
 
-    protected void DrawReview(Graphics g, GraphicsPath graphicsPath, CalcResults calc)
+    protected void DrawReview(Graphics g, GraphicsPath graphicsPath, float fraction, CalcResults calc)
+    {
+        var stabilityPercent = Math.Min(calc.Stability, requiredStability) / (float)requiredStability;
+        var colorStability = ColorUtils.Blend(colorCell, colorStabilityMax, stabilityPercent);
+
+        if (calc.LastReview is int review && calc.LastReviewDays == 0)
+        {
+            var colorReview = colorsReview[review - 1];
+
+            var antiEpilepsy = Math.Clamp(calc.Stability / 14f, 0.25f, 1f);
+            var colorEpilepsy = ColorUtils.Blend(colorStability, colorReview, antiEpilepsy);
+
+            g.FillPath(new SolidBrush(colorEpilepsy), graphicsPath);
+        }
+        else
+        {
+            g.FillPath(new SolidBrush(colorStability), graphicsPath);
+        }
+    }
+
+    protected void DrawName(Graphics g, GraphicsPath graphicsPath, Note note, Card card, DateOnly date, CalcResults calc)
     {
         if (!calc.IsNew)
         {
-            var stabilityPercent = Math.Min(calc.Stability, requiredStability) / (float)requiredStability; 
-            var colorStability = ColorUtils.Blend(colorCell, colorStabilityMax, stabilityPercent);
+            var bounds = graphicsPath.GetBounds();
+            var middle = CalcMiddlePoint(note.Number, bounds);
 
-            if (calc.LastReview is int review && calc.LastReviewDays is 0)
-            {
-                var colorReview = colors[review - 1];
+            //var misses = card.Revlogs.Where(a => a.Ease == 1 && a.Date <= date).Count();
+            //var color = ColorUtils.Blend(Color.White, Color.Red, Math.Clamp(misses / 7f, 0f, 1f));
+            //var color = ColorUtils.Blend(Color.White, Color.Red, card.Difficulty);
 
-                var antiEpilepsy = Math.Clamp(calc.Stability / 15f, 0.25f, 1f);
-
-                var blended = ColorUtils.Blend(colorStability, colorReview, antiEpilepsy);
-                g.FillPath(new SolidBrush(blended), graphicsPath);
-            }
-            else
-            {
-                g.FillPath(new SolidBrush(colorStability), graphicsPath);
-            }
-
-            g.DrawPath(Pens.White, graphicsPath);
+            var color = Color.White;
+            g.DrawStringOutlined(note.Number, font, new SolidBrush(color), penOutline, middle, stringFormatCenter);
         }
     }
 
@@ -105,18 +129,49 @@ public class MapImageGenerator(MapRegion[] regions) : BaseImageGenerator<MapCont
         if (!calc.IsNew)
         {
             var bounds = graphicsPath.GetBounds();
+            var middle = CalcMiddlePoint(note.Number, bounds);
 
-            var middle = new PointF(bounds.Left + bounds.Width / 2f, bounds.Top + bounds.Height / 2f);
-            g.DrawStringOutlined(note.Number, font, Brushes.White, new Pen(Color.FromArgb(60, 60, 60)), middle, stringFormatCenter);
+            var size = new Size(25, 8);
 
-            //g.DrawLine(Pens.White, middle.X - 10f, middle.Y, middle.X - 10f + (percent * 20f), middle.Y);
+            g.FillRectangle(new SolidBrush(colorCell), middle.X - size.Width / 2, middle.Y + 8, size.Width, size.Height);
 
-            if (calc.Stability > 7)
+            if (calc.LastReview is int review)
             {
-                var rect = new RectangleF(middle.X - 10, 15 + middle.Y - 10, 20, 20);
-                g.FillPie(Brushes.White, rect, 0, 360f * calc.Percent);
+                var colorReview = colorsReview[review - 1];
+                g.FillRectangle(new SolidBrush(colorReview), middle.X - size.Width / 2, middle.Y + 8, calc.Percent * (size.Width - 1), size.Height);
+                g.DrawRectangle(Pens.LightGray, middle.X - size.Width / 2, middle.Y + 8, calc.Percent * (size.Width - 1), size.Height);
+                g.DrawRectangle(Pens.White, middle.X - size.Width / 2, middle.Y + 8, size.Width, size.Height);
             }
         }
+    }
+
+    private static Point CalcMiddlePoint(string name, RectangleF bounds)
+    {
+        var p = new Point((int)(bounds.Left + bounds.Width / 2f), (int)(bounds.Top + bounds.Height / 2f));
+
+        return name switch
+        {
+            "NH" => p with { X = p.X + 30 },
+            "DE" => p with { X = p.X + 27 },
+            "RI" => p with { X = p.X + 27 },
+            "FL" => p with { X = p.X + 39 },
+            "VA" => p with { X = p.X + 30 },
+            "MI" => p with { X = p.X + 15 },
+            "WI" => p with { X = p.X + 4 },
+            "MS" => p with { X = p.X + 2 },
+            "MN" => p with { X = p.X - 10 },
+            "MA" => p with { X = p.X + 3 },
+            "LA" => p with { X = p.X - 13 },
+            "CA" => p with { X = p.X - 15 },
+            "OK" => p with { X = p.X + 5 },
+            "VT" => p with { X = p.X + 2, Y = p.Y - 2 },
+            "IL" => p with { Y = p.Y - 10 },
+            "NY" => p with { X = p.X - 2 },
+            "AK" => p with { X = p.X + 45, Y = p.Y - 15 },
+            "CT" => p with { X = p.X + 10, Y = p.Y + 10 },
+            "ID" => p with { Y = p.Y + 10 },
+            _ => p
+        };
     }
 }
 

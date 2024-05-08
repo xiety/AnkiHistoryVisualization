@@ -11,7 +11,7 @@ public partial class PoetryLineImageGenerator(int columns) : BaseImageGenerator<
     private static readonly Brush brushText = new SolidBrush(Color.White);
     private static readonly Pen penPercent = Pens.LightGray;
 
-    private static readonly Color[] colorReviews = [Color.Red, Color.Blue, Color.Green, Color.Yellow];
+    private static readonly Color[] colorsReview = [Color.Red, Color.Blue, Color.Green, Color.Yellow];
     private static readonly Color[] colorStabilityMax = [Color.Magenta, Color.Cyan];
 
     private static readonly int[] requiredStabilities = [60, 365];
@@ -89,7 +89,7 @@ public partial class PoetryLineImageGenerator(int columns) : BaseImageGenerator<
 
                 if (calc.LastReview is int review && calc.LastReviewDays is 0 or 1)
                 {
-                    var colorReview = colorReviews[review - 1];
+                    var colorReview = colorsReview[review - 1];
 
                     var color = calc.LastReviewDays switch
                     {

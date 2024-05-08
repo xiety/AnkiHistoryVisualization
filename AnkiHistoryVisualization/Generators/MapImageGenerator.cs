@@ -4,7 +4,7 @@ using System.Xml.Linq;
 
 namespace AnkiHistoryVisualization;
 
-public class MapImageGenerator(MapRegion[] regions) : BaseImageGenerator<MapContext>(framesPerDay: 4, colorBackground)
+public class MapImageGenerator(MapRegion[] regions) : BaseImageGenerator<MapContext>(framesPerDay: 2, colorBackground)
 {
     private static readonly Font font = new("Verdana", 9);
 
@@ -48,16 +48,15 @@ public class MapImageGenerator(MapRegion[] regions) : BaseImageGenerator<MapCont
             if (note is not null)
             {
                 var card = note.Cards.First();
-                var cell = new RectangleF();
+                var calc = Calculate(minDate, date, fraction, card);
 
-                DrawCard(g, context, minDate, date, fraction, cell, note, card, requiredStability);
+                DrawReview(g, graphicsPath, calc);
             }
             else
             {
                 g.FillPath(new SolidBrush(colorStabilityMax), graphicsPath);
+                g.DrawPath(Pens.White, graphicsPath);
             }
-
-            g.DrawPath(Pens.White, graphicsPath);
         }
 
         foreach (var region in regions)
@@ -69,42 +68,42 @@ public class MapImageGenerator(MapRegion[] regions) : BaseImageGenerator<MapCont
             if (note is not null)
             {
                 var card = note.Cards.First();
-                var cell = new RectangleF();
+                var calc = Calculate(minDate, date, fraction, card);
 
-                DrawCardPercent(g, context, minDate, date, fraction, cell, note, card, requiredStability);
+                DrawPercent(g, graphicsPath, note, calc);
             }
         }
     }
 
-    protected override void DrawReview(Graphics g, MapContext context, Note note, Card card, float fraction, RectangleF cell, Revlog revlog, float percentStability)
+    protected void DrawReview(Graphics g, GraphicsPath graphicsPath, CalcResults calc)
     {
-        //var revlogColor = colors[revlog.Ease - 1];
-        //var rect = new RectangleF(middle.X - 5, middle.Y - 5, 10, 10);
-        //g.FillRectangle(new SolidBrush(revlogColor), rect);
-
-        var colorStability = ColorUtils.Blend(colorCell, colorStabilityMax, percentStability);
-        var revlogColor = colors[revlog.Ease - 1];
-        ////var color = ColorUtils.Blend(color, colorStability, fraction);
-        var color = revlogColor;
-
-        var graphicsPath = context.GraphicsPaths[note.Number];
-        g.FillPath(new SolidBrush(color), graphicsPath);
-    }
-
-    protected override void DrawStability(Graphics g, MapContext context, Note note, Card card, RectangleF cell, float percentStability)
-    {
-        var colorStability = ColorUtils.Blend(colorCell, colorStabilityMax, percentStability);
-
-        var graphicsPath = context.GraphicsPaths[note.Number];
-
-        g.FillPath(new SolidBrush(colorStability), graphicsPath);
-    }
-
-    protected override void DrawPercent(Graphics g, MapContext context, Note note, Card card, RectangleF cell, int stabilityDays, float percent, bool isNew)
-    {
-        if (!isNew)
+        if (!calc.IsNew)
         {
-            var graphicsPath = context.GraphicsPaths[note.Number];
+            var stabilityPercent = Math.Min(calc.Stability, requiredStability) / (float)requiredStability; 
+            var colorStability = ColorUtils.Blend(colorCell, colorStabilityMax, stabilityPercent);
+
+            if (calc.LastReview is int review && calc.LastReviewDays is 0)
+            {
+                var colorReview = colors[review - 1];
+
+                var antiEpilepsy = Math.Clamp(calc.Stability / 15f, 0.25f, 1f);
+
+                var blended = ColorUtils.Blend(colorStability, colorReview, antiEpilepsy);
+                g.FillPath(new SolidBrush(blended), graphicsPath);
+            }
+            else
+            {
+                g.FillPath(new SolidBrush(colorStability), graphicsPath);
+            }
+
+            g.DrawPath(Pens.White, graphicsPath);
+        }
+    }
+
+    protected void DrawPercent(Graphics g, GraphicsPath graphicsPath, Note note, CalcResults calc)
+    {
+        if (!calc.IsNew)
+        {
             var bounds = graphicsPath.GetBounds();
 
             var middle = new PointF(bounds.Left + bounds.Width / 2f, bounds.Top + bounds.Height / 2f);
@@ -112,10 +111,10 @@ public class MapImageGenerator(MapRegion[] regions) : BaseImageGenerator<MapCont
 
             //g.DrawLine(Pens.White, middle.X - 10f, middle.Y, middle.X - 10f + (percent * 20f), middle.Y);
 
-            if (stabilityDays > 7)
+            if (calc.Stability > 7)
             {
                 var rect = new RectangleF(middle.X - 10, 15 + middle.Y - 10, 20, 20);
-                g.FillPie(Brushes.White, rect, 0, 360f * percent);
+                g.FillPie(Brushes.White, rect, 0, 360f * calc.Percent);
             }
         }
     }

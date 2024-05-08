@@ -1,11 +1,9 @@
 ﻿using System.Drawing;
 using System.Text.RegularExpressions;
 
-using Dic = System.Collections.Generic.Dictionary<AnkiHistoryVisualization.Note, AnkiHistoryVisualization.WordInfo[]>;
-
 namespace AnkiHistoryVisualization;
 
-public class PoetryWordImageGenerator(int columns) : BaseImageGenerator<PoetryWordContext>(framesPerDay: 8, colorBackground)
+public partial class PoetryWordImageGenerator(int columns) : BaseImageGenerator<PoetryWordContext>(framesPerDay: 8, colorBackground)
 {
     private static readonly Font font = new("Verdana", 9);
 
@@ -113,16 +111,16 @@ public class PoetryWordImageGenerator(int columns) : BaseImageGenerator<PoetryWo
 
             foreach (var word in words)
             {
-                var cell = context.Positions[(note, wordIndex)];
-
                 if (word.Cloze > 0)
                 {
                     var card = note.Cards.FirstOrDefault(a => a.CardType == word.Cloze - 1);
 
                     if (card is not null)
                     {
-                        DrawCard(g, context, minDate, date, fraction, cell, note, card, requiredStability);
-                        DrawCardPercent(g, context, minDate, date, fraction, cell, note, card, requiredStability);
+                        var calc = Calculate(minDate, date, fraction, card);
+                        var cell = context.Positions[(note, wordIndex)];
+
+                        DrawReview(g, cell, word.Text, calc);
                     }
                 }
 
@@ -132,31 +130,39 @@ public class PoetryWordImageGenerator(int columns) : BaseImageGenerator<PoetryWo
             index++;
         }
 
-        g.DrawImage(context.Image, 0, 0);
+        //g.DrawImage(context.Image, 0, 0);
     }
 
     private static int Measure(Graphics g, StringFormat stringFormat, string text)
         => (int)MathF.Ceiling(g.MeasureSize(text, font, stringFormat).Width) + 5;
 
-    protected override void DrawReview(Graphics g, PoetryWordContext context, Note note, Card card, float fraction, RectangleF cell, Revlog revlog, float percentStability)
+    protected void DrawReview(Graphics g, RectangleF cell, string text, CalcResults calc)
     {
-        var colorStability = ColorUtils.Blend(colorBackground, colorStabilityMax, percentStability);
-        var revlogColor = colors[revlog.Ease - 1];
-        //var color = ColorUtils.Blend(color, colorStability, fraction);
-        var color = revlogColor;
+        if (!calc.IsNew)
+        {
+            var stabilityPercent = Math.Min(calc.Stability, requiredStability) / (float)requiredStability;
+            var colorStability = ColorUtils.Blend(colorBackground, colorStabilityMax, stabilityPercent);
 
-        g.FillRectangle(new SolidBrush(color), cell);
-    }
+            if (calc.LastReview is int review && calc.LastReviewDays is 0)
+            {
+                var revlogColor = colors[review - 1];
+                //var color = ColorUtils.Blend(color, colorStability, fraction);
+                var color = revlogColor;
 
-    protected override void DrawStability(Graphics g, PoetryWordContext context, Note note, Card card, RectangleF cell, float percentStability)
-    {
-        var colorStability = ColorUtils.Blend(colorBackground, colorStabilityMax, percentStability);
-        g.FillRectangle(new SolidBrush(colorStability), cell);
-    }
+                g.FillRectangle(new SolidBrush(color), cell);
+            }
+            else
+            {
+                g.FillRectangle(new SolidBrush(colorStability), cell);
+            }
 
-    protected override void DrawPercent(Graphics g, PoetryWordContext context, Note note, Card card, RectangleF cell, int stabilityDays, float percent, bool isNew)
-    {
-        g.DrawLine(penPercent, cell.Left, cell.Bottom, cell.Left + (percent * cell.Width), cell.Bottom);
+            g.DrawLine(penPercent, cell.Left, cell.Bottom, cell.Left + (calc.Percent * cell.Width), cell.Bottom);
+
+            var stringFormat = new StringFormat(StringFormat.GenericTypographic);
+            stringFormat.FormatFlags |= StringFormatFlags.MeasureTrailingSpaces;
+
+            g.DrawStringOutlined(text, font, Brushes.White, penOutline, new PointF(cell.X + 2, cell.Y), stringFormat);
+        }
     }
 
     private static List<WordInfo> GroupSiblings(List<WordInfo> acc, WordInfo item)
@@ -199,16 +205,16 @@ public class PoetryWordImageGenerator(int columns) : BaseImageGenerator<PoetryWo
             }
         }
     }
-}
 
-public static partial class Regs
-{
-    [GeneratedRegex(@"<div[^>]*>\s*\d+\.\s*(.*?)<\/div>(?!.*<div)", RegexOptions.Singleline | RegexOptions.RightToLeft)]
-    public static partial Regex RegexDiv();
+    public static partial class Regs
+    {
+        [GeneratedRegex(@"<div[^>]*>\s*\d+\.\s*(.*?)<\/div>(?!.*<div)", RegexOptions.Singleline | RegexOptions.RightToLeft)]
+        public static partial Regex RegexDiv();
 
-    [GeneratedRegex(@"(?<cloze>\{\{c(?<number>\d+)::(?<text>.*?)\}\})|(?<plainText>[^{}]+)")]
-    public static partial Regex RegexCloze();
+        [GeneratedRegex(@"(?<cloze>\{\{c(?<number>\d+)::(?<text>.*?)\}\})|(?<plainText>[^{}]+)")]
+        public static partial Regex RegexCloze();
+    }
 }
 
 public record WordInfo(int Cloze, string Text);
-public record PoetryWordContext(Size ImageSize, int ColumnWidth, Dic Converted, Dictionary<(Note, int), Rectangle> Positions, Bitmap Image);
+public record PoetryWordContext(Size ImageSize, int ColumnWidth, Dictionary<Note, WordInfo[]> Converted, Dictionary<(Note, int), Rectangle> Positions, Bitmap Image);

@@ -48,46 +48,46 @@ public class PeriodicTableImagesGenerator(Position[] positions) : BaseImageGener
 
             var cell = new RectangleF(x, y, boxSize, boxSize);
 
-            g.FillRectangle(brushShadow, x + 3, y + 3, boxSize, boxSize);
-
             var note = notes.FirstOrDefault(a => a.Text == pos.Name);
 
             if (note is not null)
             {
                 var card = note.Cards.First();
-                DrawCard(g, null, minDate, date, fraction, cell, note, card, requiredStability);
-                DrawCardPercent(g, null, minDate, date, fraction, cell, note, card, requiredStability);
+                var calc = Calculate(minDate, date, fraction, card);
+
+                if (!calc.IsNew)
+                {
+                    g.FillRectangle(brushShadow, x + 3, y + 3, boxSize, boxSize);
+                    DrawReview(g, cell, fraction, calc);
+                    DrawBox(g, x, y, pos.Number, pos.Name);
+                }
             }
             else
             {
                 // not yet studied elements
-                g.FillRectangle(new SolidBrush(colorCell), cell);
+                //g.FillRectangle(new SolidBrush(colorCell), cell);
             }
-
-            DrawBox(g, x, y, pos.Number, pos.Name);
         }
     }
 
-    protected override void DrawReview(Graphics g, object? context, Note note, Card card, float fraction, RectangleF cell, Revlog revlog, float percentStability)
+    protected void DrawReview(Graphics g, RectangleF cell, float fraction, CalcResults calc)
     {
-        var colorStability = ColorUtils.Blend(colorCell, colorStabilityMax, percentStability);
+        var stabilityPercent = Math.Min(calc.Stability, requiredStability) / (float)requiredStability;
+        var colorStability = ColorUtils.Blend(colorCell, colorStabilityMax, stabilityPercent);
 
-        var revlogColor = colors[revlog.Ease - 1];
-        var color = ColorUtils.Blend(revlogColor, colorStability, fraction);
+        if (calc.LastReview is int review && calc.LastReviewDays is 0)
+        {
+            var revlogColor = colors[review - 1];
+            var color = ColorUtils.Blend(revlogColor, colorStability, fraction);
 
-        // review on this day
-        g.FillRectangle(new SolidBrush(color), cell);
-    }
+            g.FillRectangle(new SolidBrush(color), cell);
+        }
+        else
+        {
+            g.FillRectangle(new SolidBrush(colorStability), cell);
+        }
 
-    protected override void DrawStability(Graphics g, object? context, Note note, Card card, RectangleF cell, float percentStability)
-    {
-        var colorStability = ColorUtils.Blend(colorCell, colorStabilityMax, percentStability);
-        g.FillRectangle(new SolidBrush(colorStability), cell);
-    }
-
-    protected override void DrawPercent(Graphics g, object? context, Note note, Card card, RectangleF cell, int stabilityDays, float percent, bool isNew)
-    {
-        g.DrawLine(penPercent, cell.Left + 2, cell.Bottom - 2, cell.Left + 2 + (percent * (cell.Width - 4)), cell.Bottom - 2);
+        g.DrawLine(penPercent, cell.Left + 2, cell.Bottom - 2, cell.Left + 2 + (calc.Percent * (cell.Width - 4)), cell.Bottom - 2);
     }
 
     private static void DrawBox(Graphics g, float x, float y, int number, string name)

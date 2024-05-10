@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 
 namespace AnkiHistoryVisualization;
 
-public partial class PoetryWordImageGenerator(int columns) : BaseImageGenerator<PoetryWordContext>(framesPerDay: 8, colorBackground)
+public partial class PoetryWordImageGenerator(int columns) : BaseImageGenerator<PoetryWordContext>(framesPerDay: 4, colorBackground)
 {
     private static readonly Font font = new("Verdana", 9);
 
@@ -115,7 +115,7 @@ public partial class PoetryWordImageGenerator(int columns) : BaseImageGenerator<
                     {
                         var calc = Calculate(minDate, date, fraction, card);
 
-                        DrawReview(g, cell, word.Text, calc);
+                        DrawReview(g, cell, word.Text, calc, fraction);
                     }
                     else
                     {
@@ -133,7 +133,7 @@ public partial class PoetryWordImageGenerator(int columns) : BaseImageGenerator<
     private static int Measure(Graphics g, StringFormat stringFormat, string text)
         => (int)MathF.Ceiling(g.MeasureSize(text, font, stringFormat).Width) + 5;
 
-    protected static void DrawReview(Graphics g, RectangleF cell, string text, CalcResults calc)
+    protected static void DrawReview(Graphics g, RectangleF cell, string text, CalcResults calc, float fraction)
     {
         var stringFormat = new StringFormat(StringFormat.GenericTypographic);
         stringFormat.FormatFlags |= StringFormatFlags.MeasureTrailingSpaces;
@@ -145,18 +145,17 @@ public partial class PoetryWordImageGenerator(int columns) : BaseImageGenerator<
 
             if (calc.LastReview is int review)
             {
-                var revlogColor = reviewColors[review - 1];
+                var colorRevlog = reviewColors[review - 1];
 
-                if (calc.LastReviewDays is 0)
+                var color = calc.LastReviewDays switch
                 {
-                    g.FillRectangle(new SolidBrush(revlogColor), cell);
-                }
-                else
-                {
-                    g.FillRectangle(new SolidBrush(colorStability), cell);
-                }
+                    0 => colorRevlog,
+                    _ => colorStability,
+                };
 
-                g.DrawLine(Pens.White, cell.Left, cell.Bottom + 1, cell.Left + (calc.Percent * (cell.Width - 1)), cell.Bottom + 1);
+                g.FillRectangle(new SolidBrush(color), cell);
+
+                g.DrawLine(penPercent, cell.Left, cell.Bottom + 1, cell.Left + (calc.Percent * (cell.Width - 1)), cell.Bottom + 1);
             }
 
             g.DrawStringOutlined(text, font, Brushes.White, penOutline, new PointF(cell.X + 2, cell.Y - 1), stringFormat);
@@ -186,7 +185,8 @@ public partial class PoetryWordImageGenerator(int columns) : BaseImageGenerator<
 
     private static IEnumerable<WordInfo> ParseNote(Note note)
     {
-        var matchDiv = Regs.RegexDiv().Match(note.Text);
+        var matchesDiv = Regs.RegexDiv().Matches(note.Text);
+        var matchDiv = matchesDiv.Reverse().First(a => !a.Value.Contains("::word}}"));
         var text = matchDiv.Groups[1].Value;
 
         var parsedElements = new List<(int, string)>();
@@ -210,7 +210,7 @@ public partial class PoetryWordImageGenerator(int columns) : BaseImageGenerator<
 
     public static partial class Regs
     {
-        [GeneratedRegex(@"<div[^>]*>\s*\d+\.\s*(.*?)<\/div>(?!.*<div)", RegexOptions.Singleline | RegexOptions.RightToLeft)]
+        [GeneratedRegex(@"<div[^>]*>\s*\d+\.\s*(.*?)<\/div>", RegexOptions.Singleline)]
         public static partial Regex RegexDiv();
 
         [GeneratedRegex(@"(?<cloze>\{\{c(?<number>\d+)::(?<text>.*?)\}\})|(?<plainText>[^{}]+)")]

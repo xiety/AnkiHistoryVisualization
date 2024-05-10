@@ -19,7 +19,7 @@ public abstract class BaseImageGenerator<TContext>(int framesPerDay, Color color
         imageSize = new(imageSize.Width & ~1, imageSize.Height & ~1);
 
         var (minDate, maxDate) = DeckUtils.GetMinMaxDate(notes);
-        maxDate = DateOnly.FromDateTime(DateTime.Now);
+        maxDate = DateOnly.FromDateTime(DateTime.Now).AddDays(1);
 
         foreach (var date in minDate.EnumerateToInclusive(maxDate))
         {

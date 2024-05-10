@@ -16,7 +16,20 @@ https://github.com/xiety/AnkiHistoryVisualization/raw/main/docs/PeriodicTable.mp
 
 ## Other posts
 
+### US Capitals
+
 https://www.reddit.com/r/Anki/comments/1co0gpz/visualization_of_my_us_capitals_memorization/
+
+### English words
+
 https://www.reddit.com/r/Anki/comments/1cij3y5/visualization_of_my_english_words_memorization/
+
 https://www.reddit.com/r/Anki/comments/1ccpej9/visualizing_vocabulary_infusion_into_my_cognitive/
+
+### Dante's Inferno Lines
+
 https://www.reddit.com/r/Anki/comments/1c1fcxs/playing_with_the_visualization_of_myself/
+
+### Periodic Table
+
+https://www.reddit.com/r/Anki/comments/1c72p89/visualization_of_my_periodic_table_memorization/

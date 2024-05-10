@@ -77,8 +77,8 @@ public class PeriodicTableImagesGenerator(Position[] positions) : BaseImageGener
 
         if (calc.LastReview is int review && calc.LastReviewDays is 0)
         {
-            var revlogColor = colors[review - 1];
-            var color = ColorUtils.Blend(revlogColor, colorStability, fraction);
+            var colorRevlog = colors[review - 1];
+            var color = ColorUtils.Blend(colorRevlog, colorStability, fraction);
 
             g.FillRectangle(new SolidBrush(color), cell);
         }

@@ -3,9 +3,9 @@ using System.Text.RegularExpressions;
 
 namespace AnkiHistoryVisualization;
 
-public partial class PoetryLineImageGenerator(int columns) : BaseImageGenerator<PoetryLineContext>(framesPerDay: 4, colorBackground)
+public partial class PoetryLineImageGenerator(int columns, int fontSize) : BaseImageGenerator<PoetryLineContext>(framesPerDay: 4, colorBackground)
 {
-    private static readonly Font font = new("Arial", 3, FontStyle.Bold);
+    private readonly Font font = new("Arial", fontSize, FontStyle.Bold);
 
     private static readonly Color colorBackground = Color.FromArgb(0, 0, 0);
     private static readonly Brush brushText = new SolidBrush(Color.White);
@@ -42,7 +42,7 @@ public partial class PoetryLineImageGenerator(int columns) : BaseImageGenerator<
         return new(new(width, height), blockSize, rows);
     }
 
-    private static Size CalcBlockSize(Graphics g, Note[] notes)
+    private Size CalcBlockSize(Graphics g, Note[] notes)
     {
         var max_x = 0.0f;
         var max_y = 0.0f;

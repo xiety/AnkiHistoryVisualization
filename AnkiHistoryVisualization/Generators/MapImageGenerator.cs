@@ -34,7 +34,6 @@ public class MapImageGenerator(MapRegion[] regions) : BaseImageGenerator<MapCont
 
     protected override void DrawImage(Graphics g, Note[] notes, MapContext context, DateOnly minDate, DateOnly date, float fraction)
     {
-        //g.InterpolationMode = InterpolationMode.HighQualityBicubic;
         g.SmoothingMode = SmoothingMode.HighQuality;
 
         foreach (var region in regions)
@@ -88,7 +87,7 @@ public class MapImageGenerator(MapRegion[] regions) : BaseImageGenerator<MapCont
         }
     }
 
-    protected void DrawReview(Graphics g, GraphicsPath graphicsPath, float fraction, CalcResults calc)
+    protected static void DrawReview(Graphics g, GraphicsPath graphicsPath, float fraction, CalcResults calc)
     {
         var stabilityPercent = Math.Min(calc.Stability, requiredStability) / (float)requiredStability;
         var colorStability = ColorUtils.Blend(colorCell, colorStabilityMax, stabilityPercent);
@@ -108,23 +107,17 @@ public class MapImageGenerator(MapRegion[] regions) : BaseImageGenerator<MapCont
         }
     }
 
-    protected void DrawName(Graphics g, GraphicsPath graphicsPath, Note note, Card card, DateOnly date, CalcResults calc)
+    protected static void DrawName(Graphics g, GraphicsPath graphicsPath, Note note, Card card, DateOnly date, CalcResults calc)
     {
         if (!calc.IsNew)
         {
             var bounds = graphicsPath.GetBounds();
             var middle = CalcMiddlePoint(note.Number, bounds);
-
-            //var misses = card.Revlogs.Where(a => a.Ease == 1 && a.Date <= date).Count();
-            //var color = ColorUtils.Blend(Color.White, Color.Red, Math.Clamp(misses / 7f, 0f, 1f));
-            //var color = ColorUtils.Blend(Color.White, Color.Red, card.Difficulty);
-
-            var color = Color.White;
-            g.DrawStringOutlined(note.Number, font, new SolidBrush(color), penOutline, middle, stringFormatCenter);
+            g.DrawStringOutlined(note.Number, font, Brushes.White, penOutline, middle, stringFormatCenter);
         }
     }
 
-    protected void DrawPercent(Graphics g, GraphicsPath graphicsPath, Note note, CalcResults calc)
+    protected static void DrawPercent(Graphics g, GraphicsPath graphicsPath, Note note, CalcResults calc)
     {
         if (!calc.IsNew)
         {
@@ -149,6 +142,7 @@ public class MapImageGenerator(MapRegion[] regions) : BaseImageGenerator<MapCont
     {
         var p = new Point((int)(bounds.Left + bounds.Width / 2f), (int)(bounds.Top + bounds.Height / 2f));
 
+        // Manual offsets
         return name switch
         {
             "NH" => p with { X = p.X + 30 },

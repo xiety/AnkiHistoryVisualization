@@ -60,45 +60,37 @@ public partial class PoetryWordImageGenerator(int columns) : BaseImageGenerator<
             }
         }
 
+        var index = 0;
+
+        foreach (var (note, words) in converted)
+        {
+            var row = index % rows;
+            var column = index / rows;
+
+            var x = margin + column * (columnWidth + columnGap);
+            var y = offsetY + row * (rowHeight + verticalGap);
+
+            var wordIndex = 0;
+
+            foreach (var word in words)
+            {
+                var wordWidth = widths[word.Text];
+
+                positions.Add((note, wordIndex), new(x, y, wordWidth - 2, rowHeight));
+
+                x += wordWidth;
+                wordIndex++;
+            }
+
+            index++;
+        }
+
         var total = new Size(
             margin * 2 + columns * (columnWidth + columnGap),
             offsetY + margin * 2 + rows * (rowHeight + verticalGap)
         );
 
-        var bitmapText = new Bitmap(total.Width, total.Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
-
-        using (var g = Graphics.FromImage(bitmapText))
-        {
-            var index = 0;
-
-            foreach (var (note, words) in converted)
-            {
-                var row = index % rows;
-                var column = index / rows;
-
-                var x = margin + column * (columnWidth + columnGap);
-                var y = offsetY + row * (rowHeight + verticalGap);
-
-                var wordIndex = 0;
-
-                foreach (var word in words)
-                {
-                    var wordWidth = widths[word.Text];
-
-                    //g.DrawStringOutlined(word.Text, font, Brushes.White, penOutline, new PointF(x + 2, y), stringFormat);
-
-                    positions.Add((note, wordIndex), new(x, y, wordWidth - 2, rowHeight));
-
-                    x += wordWidth;
-
-                    wordIndex++;
-                }
-
-                index++;
-            }
-        }
-
-        return new(total, columnWidth, converted, positions, bitmapText);
+        return new(total, columnWidth, converted, positions);
     }
 
     protected override void DrawImage(Graphics g, Note[] notes, PoetryWordContext context, DateOnly minDate, DateOnly date, float fraction)
@@ -136,14 +128,12 @@ public partial class PoetryWordImageGenerator(int columns) : BaseImageGenerator<
 
             index++;
         }
-
-        //g.DrawImage(context.Image, 0, 0);
     }
 
     private static int Measure(Graphics g, StringFormat stringFormat, string text)
         => (int)MathF.Ceiling(g.MeasureSize(text, font, stringFormat).Width) + 5;
 
-    protected void DrawReview(Graphics g, RectangleF cell, string text, CalcResults calc)
+    protected static void DrawReview(Graphics g, RectangleF cell, string text, CalcResults calc)
     {
         var stringFormat = new StringFormat(StringFormat.GenericTypographic);
         stringFormat.FormatFlags |= StringFormatFlags.MeasureTrailingSpaces;
@@ -167,7 +157,6 @@ public partial class PoetryWordImageGenerator(int columns) : BaseImageGenerator<
                 }
 
                 g.DrawLine(Pens.White, cell.Left, cell.Bottom + 1, cell.Left + (calc.Percent * (cell.Width - 1)), cell.Bottom + 1);
-                //g.FillRectangle(new SolidBrush(revlogColor), cell.Left, cell.Bottom + 1, calc.Percent * cell.Width, 2);
             }
 
             g.DrawStringOutlined(text, font, Brushes.White, penOutline, new PointF(cell.X + 2, cell.Y - 1), stringFormat);
@@ -230,4 +219,4 @@ public partial class PoetryWordImageGenerator(int columns) : BaseImageGenerator<
 }
 
 public record WordInfo(int Cloze, string Text);
-public record PoetryWordContext(Size ImageSize, int ColumnWidth, Dictionary<Note, WordInfo[]> Converted, Dictionary<(Note, int), Rectangle> Positions, Bitmap Image);
+public record PoetryWordContext(Size ImageSize, int ColumnWidth, Dictionary<Note, WordInfo[]> Converted, Dictionary<(Note, int), Rectangle> Positions);

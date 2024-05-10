@@ -13,3 +13,10 @@ https://github.com/xiety/AnkiHistoryVisualization/assets/867537/e7b9115d-19c0-49
 Download PeriodicTable.mp4 video:
 
 https://github.com/xiety/AnkiHistoryVisualization/raw/main/docs/PeriodicTable.mp4
+
+## Other posts
+
+https://www.reddit.com/r/Anki/comments/1co0gpz/visualization_of_my_us_capitals_memorization/
+https://www.reddit.com/r/Anki/comments/1cij3y5/visualization_of_my_english_words_memorization/
+https://www.reddit.com/r/Anki/comments/1ccpej9/visualizing_vocabulary_infusion_into_my_cognitive/
+https://www.reddit.com/r/Anki/comments/1c1fcxs/playing_with_the_visualization_of_myself/

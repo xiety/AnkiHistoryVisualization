@@ -65,12 +65,12 @@ public class PeriodicTableImagesGenerator(Position[] positions) : BaseImageGener
             else
             {
                 // not yet studied elements
-                //g.FillRectangle(new SolidBrush(colorCell), cell);
+                g.FillRectangle(new SolidBrush(colorCell), cell);
             }
         }
     }
 
-    protected void DrawReview(Graphics g, RectangleF cell, float fraction, CalcResults calc)
+    protected static void DrawReview(Graphics g, RectangleF cell, float fraction, CalcResults calc)
     {
         var stabilityPercent = Math.Min(calc.Stability, requiredStability) / (float)requiredStability;
         var colorStability = ColorUtils.Blend(colorCell, colorStabilityMax, stabilityPercent);

@@ -7,7 +7,7 @@ public partial class PoetryWordImageGenerator(int columns) : BaseImageGenerator<
 {
     private static readonly Font font = new("Verdana", 9);
 
-    private static readonly Color[] colors = [Color.Red, Color.Blue, Color.Green, Color.Yellow];
+    private static readonly Color[] reviewColors = [Color.Red, Color.DodgerBlue, Color.Green, Color.Yellow];
 
     private static readonly Color colorStabilityMax = Color.Magenta;
     private static readonly Color colorBackground = Color.FromArgb(0, 0, 0);
@@ -15,10 +15,10 @@ public partial class PoetryWordImageGenerator(int columns) : BaseImageGenerator<
     private static readonly Pen penOutline = new(Color.Black, 2);
 
     private const int requiredStability = 60;
-    private const int rowHeight = 16;
+    private const int rowHeight = 15;
     private const int offsetY = 12;
     private const int margin = 2;
-    private const int gap = 1;
+    private const int verticalGap = 3;
     private const int columnGap = 2;
 
     protected override Size CalculateImageSize(PoetryWordContext context)
@@ -60,7 +60,10 @@ public partial class PoetryWordImageGenerator(int columns) : BaseImageGenerator<
             }
         }
 
-        var total = new Size(margin * 2 + columns * (columnWidth + columnGap), offsetY + margin * 2 + rows * (rowHeight + gap));
+        var total = new Size(
+            margin * 2 + columns * (columnWidth + columnGap),
+            offsetY + margin * 2 + rows * (rowHeight + verticalGap)
+        );
 
         var bitmapText = new Bitmap(total.Width, total.Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
 
@@ -74,7 +77,7 @@ public partial class PoetryWordImageGenerator(int columns) : BaseImageGenerator<
                 var column = index / rows;
 
                 var x = margin + column * (columnWidth + columnGap);
-                var y = offsetY + row * (rowHeight + gap);
+                var y = offsetY + row * (rowHeight + verticalGap);
 
                 var wordIndex = 0;
 
@@ -82,9 +85,9 @@ public partial class PoetryWordImageGenerator(int columns) : BaseImageGenerator<
                 {
                     var wordWidth = widths[word.Text];
 
-                    g.DrawStringOutlined(word.Text, font, Brushes.White, penOutline, new PointF(x + 2, y), stringFormat);
+                    //g.DrawStringOutlined(word.Text, font, Brushes.White, penOutline, new PointF(x + 2, y), stringFormat);
 
-                    positions.Add((note, wordIndex), new(x, y, wordWidth - 1, rowHeight));
+                    positions.Add((note, wordIndex), new(x, y, wordWidth - 2, rowHeight));
 
                     x += wordWidth;
 
@@ -113,14 +116,18 @@ public partial class PoetryWordImageGenerator(int columns) : BaseImageGenerator<
             {
                 if (word.Cloze > 0)
                 {
+                    var cell = context.Positions[(note, wordIndex)];
                     var card = note.Cards.FirstOrDefault(a => a.CardType == word.Cloze - 1);
 
                     if (card is not null)
                     {
                         var calc = Calculate(minDate, date, fraction, card);
-                        var cell = context.Positions[(note, wordIndex)];
 
                         DrawReview(g, cell, word.Text, calc);
+                    }
+                    else
+                    {
+                        g.DrawStringOutlined(word.Text, font, new SolidBrush(Color.FromArgb(50, 50, 50)), new(Color.Black, 1), new PointF(cell.X + 2, cell.Y - 1), stringFormat);
                     }
                 }
 
@@ -138,30 +145,36 @@ public partial class PoetryWordImageGenerator(int columns) : BaseImageGenerator<
 
     protected void DrawReview(Graphics g, RectangleF cell, string text, CalcResults calc)
     {
+        var stringFormat = new StringFormat(StringFormat.GenericTypographic);
+        stringFormat.FormatFlags |= StringFormatFlags.MeasureTrailingSpaces;
+
         if (!calc.IsNew)
         {
             var stabilityPercent = Math.Min(calc.Stability, requiredStability) / (float)requiredStability;
             var colorStability = ColorUtils.Blend(colorBackground, colorStabilityMax, stabilityPercent);
 
-            if (calc.LastReview is int review && calc.LastReviewDays is 0)
+            if (calc.LastReview is int review)
             {
-                var revlogColor = colors[review - 1];
-                //var color = ColorUtils.Blend(color, colorStability, fraction);
-                var color = revlogColor;
+                var revlogColor = reviewColors[review - 1];
 
-                g.FillRectangle(new SolidBrush(color), cell);
+                if (calc.LastReviewDays is 0)
+                {
+                    g.FillRectangle(new SolidBrush(revlogColor), cell);
+                }
+                else
+                {
+                    g.FillRectangle(new SolidBrush(colorStability), cell);
+                }
+
+                g.DrawLine(Pens.White, cell.Left, cell.Bottom + 1, cell.Left + (calc.Percent * (cell.Width - 1)), cell.Bottom + 1);
+                //g.FillRectangle(new SolidBrush(revlogColor), cell.Left, cell.Bottom + 1, calc.Percent * cell.Width, 2);
             }
-            else
-            {
-                g.FillRectangle(new SolidBrush(colorStability), cell);
-            }
 
-            g.DrawLine(penPercent, cell.Left, cell.Bottom, cell.Left + (calc.Percent * cell.Width), cell.Bottom);
-
-            var stringFormat = new StringFormat(StringFormat.GenericTypographic);
-            stringFormat.FormatFlags |= StringFormatFlags.MeasureTrailingSpaces;
-
-            g.DrawStringOutlined(text, font, Brushes.White, penOutline, new PointF(cell.X + 2, cell.Y), stringFormat);
+            g.DrawStringOutlined(text, font, Brushes.White, penOutline, new PointF(cell.X + 2, cell.Y - 1), stringFormat);
+        }
+        else
+        {
+            g.DrawStringOutlined(text, font, new SolidBrush(Color.FromArgb(50, 50, 50)), penOutline, new PointF(cell.X + 2, cell.Y - 1), stringFormat);
         }
     }
 

@@ -49,20 +49,23 @@ public abstract class BaseImageGenerator<TContext>(int framesPerDay, Color color
         var revlogNext = card.Revlogs.FirstOrDefault(a => a.Date > date);
 
         var stability = CalcStability(card, revlogPrev, revlogNext);
-        var percent = CalcPercentToNextReview(minDate, date, fraction, card, revlogPrev, revlogNext);
+
+        var revlogPrevDate = revlogPrev?.Date ?? minDate;
+        var revlogNextDate = revlogNext?.Date ?? card.Due;
+        var nextDue = revlogNext?.Due ?? revlogNextDate;
+
+        var percent = CalcPercentToNextReview(date, fraction, revlogPrevDate, revlogNextDate);
+        var duePercent = CalcPercentToNextReview(date, fraction, revlogPrevDate, nextDue);
+        var reviewInDuePercent = CalcPercentToNextReview(revlogNextDate, 0, revlogPrevDate, nextDue);
 
         var lastReviewDays = revlogPrev is not null ? date.DayNumber - revlogPrev.Date.DayNumber : (int?)null;
 
-        return new(revlogPrev?.Ease, lastReviewDays, stability, percent, revlogPrev is null);
+        return new(revlogPrev?.Ease, lastReviewDays, nextDue, stability, percent, duePercent, reviewInDuePercent, revlogPrev is null);
     }
 
-    protected static float CalcPercentToNextReview(DateOnly minDate, DateOnly date, float fraction, Card card, Revlog? revlogPrev, Revlog? revlogNext)
+    protected static float CalcPercentToNextReview(DateOnly date, float fraction, DateOnly revlogPrevDate, DateOnly revlogNextDate)
     {
-        var datePrev = revlogPrev is not null ? revlogPrev.Date : minDate;
-        var dateNext = revlogNext is not null ? revlogNext.Date : card.Due;
-
-        var percent = (date.DayNumber - datePrev.DayNumber + fraction) / (float)(dateNext.DayNumber - datePrev.DayNumber);
-
+        var percent = (date.DayNumber - revlogPrevDate.DayNumber + fraction) / (float)(revlogNextDate.DayNumber - revlogPrevDate.DayNumber);
         return Math.Clamp(percent, 0f, 1f);
     }
 
@@ -78,4 +81,4 @@ public abstract class BaseImageGenerator<TContext>(int framesPerDay, Color color
     }
 }
 
-public record CalcResults(int? LastReview, int? LastReviewDays, int Stability, float Percent, bool IsNew);
+public record CalcResults(int? LastReview, int? LastReviewDays, DateOnly? DueDate, int Stability, float Percent, float DuePercent, float ReviewInDuePercent, bool IsNew);

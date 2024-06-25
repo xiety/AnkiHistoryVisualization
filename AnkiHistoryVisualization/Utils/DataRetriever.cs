@@ -24,7 +24,7 @@ public static class DataRetriever
             .Include(a => a.Cards.AsQueryable().Where(filter).OrderBy(b => b.Ord))
             .ThenInclude(a => a.Deck)
             .Include(a => a.Cards)
-            .ThenInclude(a => a.Revlogs.Where(b => b.Type != 4))
+            .ThenInclude(a => a.Revlogs)
             .Where(a => a.Cards.AsQueryable().Any(filter))
             .OrderBy(a => a.Id);
 
@@ -34,7 +34,7 @@ public static class DataRetriever
 
         var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
 
-        var data = notes
+        var data = notes.Take(1)
             .Select(note =>
             {
                 var fields = note.Flds.Split("\u001f");
@@ -48,11 +48,7 @@ public static class DataRetriever
                     var data = JsonSerializer.Deserialize<DataInfo>(card.Data, jsonOptions)!;
                     var difficulty = (data.D - 1.0f) / 9.0f;
 
-                    var revlogs = card.Revlogs
-                        .GroupBy(a => ConvertDateWithNight(a.Id, 4))
-                        .Select(a => new Revlog(a.Key, a.MinBy(a => a.Id)!.Ease))
-                        .OrderBy(a => a.Date)
-                        .ToArray();
+                    var revlogs = ConvertRevLogs(card.Revlogs).ToArray();
 
                     return new Card(card.Id, card.Ord, due, difficulty, revlogs);
                 }).ToArray();
@@ -62,6 +58,51 @@ public static class DataRetriever
             .ToArray();
 
         return data;
+    }
+
+    private static IEnumerable<Revlog> ConvertRevLogs(IEnumerable<RevlogTable> revlogs)
+    {
+        DateOnly? lastDate = null;
+        DateOnly? dueDateIncorrect = null;
+        DateOnly? lastReviewDate = null;
+        var hasReviewForThisDate = false;
+
+        foreach (var revlog in revlogs.OrderBy(a => a.Id))
+        {
+            var date = ConvertDateWithNight(revlog.Id, 4);
+
+            if (date != lastDate)
+                hasReviewForThisDate = false;
+
+            if (revlog.Type is RevlogType.Filtered or RevlogType.Learn or RevlogType.Review)
+            {
+                if (!hasReviewForThisDate)
+                {
+                    var calcDue = lastReviewDate is DateOnly d
+                        ? d.AddDays(revlog.LastIvl)
+                        : (DateOnly?)null;
+
+                    yield return new(date, revlog.Ease, calcDue);
+
+                    hasReviewForThisDate = true;
+                    lastReviewDate = DateOnly.FromDateTime(revlog.Id); //date;
+                }
+            }
+
+            dueDateIncorrect = date.AddDays(revlog.Ivl);
+
+            lastDate = date;
+        }
+
+        //return revlogs
+        //    .GroupBy(a => ConvertDateWithNight(a.Id, 4))
+        //    .Select(a =>
+        //    {
+        //        var revlog = a.MinBy(a => a.Id)!;
+        //        return new Revlog(a.Key, revlog.Ease, revlog.Ivl);
+        //    })
+        //    .OrderBy(a => a.Date)
+        //    .ToArray();
     }
 
     private static DateOnly ConvertDateWithNight(DateTime dateTime, int nextDayHour)
@@ -83,4 +124,4 @@ public static class DataRetriever
 
 public record Note(long NoteId, string Number, string Text, Card[] Cards);
 public record Card(long CardId, int CardType, DateOnly Due, float Difficulty, Revlog[] Revlogs);
-public record Revlog(DateOnly Date, int Ease);
+public record Revlog(DateOnly Date, int Ease, DateOnly? Due);

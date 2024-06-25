@@ -105,7 +105,14 @@ public partial class RevlogTable
     public DateTime Id { get; set; }
     public long Cid { get; set; }
     public int Ease { get; set; }
-    public int Type { get; set; }
+    public RevlogType Type { get; set; }
+    public int Ivl { get; set; }
+    public int LastIvl { get; set; }
 
     public CardTable Card { get; set; } = default!;
+}
+
+public enum RevlogType
+{
+    Learn, Review, Relearn, Filtered, Manual
 }

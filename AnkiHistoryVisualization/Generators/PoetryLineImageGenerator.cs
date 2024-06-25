@@ -74,37 +74,37 @@ public partial class PoetryLineImageGenerator(int columns, int fontSize) : BaseI
 
         foreach (var note in notes)
         {
-            if (!note.Text.Contains("(End)"))
+            var card = note.Cards.First();
+
+            var x = margin + column * (context.BlockSize.Width + gap.Width);
+            var y = offsetY + row * (context.BlockSize.Height + gap.Height);
+
+            var text = GetText(note.Text);
+
+            var calc = Calculate(minDate, date, fraction, card);
+
+            var colorStability = CalcStabilityColor(calc.Stability);
+
+            if (calc.LastReview is int review && calc.LastReviewDays is 0 or 1)
             {
-                var card = note.Cards.First();
+                var colorReview = colorsReview[review - 1];
 
-                var x = margin + column * (context.BlockSize.Width + gap.Width);
-                var y = offsetY + row * (context.BlockSize.Height + gap.Height);
-
-                var text = GetText(note.Text);
-
-                var calc = Calculate(minDate, date, fraction, card);
-
-                var colorStability = CalcStabilityColor(calc.Stability);
-
-                if (calc.LastReview is int review && calc.LastReviewDays is 0 or 1)
+                var color = calc.LastReviewDays switch
                 {
-                    var colorReview = colorsReview[review - 1];
+                    0 => colorReview,
+                    1 => ColorUtils.Blend(colorReview, colorBackground, Math.Clamp(fraction, 0f, 1f)),
+                    _ => colorStability,
+                };
 
-                    var color = calc.LastReviewDays switch
-                    {
-                        0 => colorReview,
-                        1 => ColorUtils.Blend(colorReview, colorBackground, Math.Clamp(fraction, 0f, 1f)),
-                        _ => colorStability,
-                    };
-
-                    g.FillRectangle(new SolidBrush(color), x + (knowWidth - 1), y, context.BlockSize.Width - (knowWidth - 1), context.BlockSize.Height);
-                }
-
-                g.FillRectangle(new SolidBrush(colorStability), x, y, knowWidth - 1, context.BlockSize.Height);
-                g.DrawString(text, font, brushText, knowWidth + x, y - 1);
-                g.DrawLine(penPercent, x + knowWidth, y + context.BlockSize.Height - 1, x + knowWidth + calc.Percent * (context.BlockSize.Width - knowWidth), y + context.BlockSize.Height - 1);
+                g.FillRectangle(new SolidBrush(color), x + (knowWidth - 1), y, context.BlockSize.Width - (knowWidth - 1), context.BlockSize.Height);
             }
+
+            g.FillRectangle(new SolidBrush(colorStability), x, y, knowWidth - 1, context.BlockSize.Height);
+            g.DrawString(text, font, brushText, knowWidth + x, y - 1);
+
+            var py = y + context.BlockSize.Height - 1;
+            g.DrawLine(penPercent, x + knowWidth, py, x + knowWidth + calc.DuePercent * (context.BlockSize.Width - knowWidth), py);
+            g.DrawLine(penPercent, x + knowWidth + calc.ReviewInDuePercent * (context.BlockSize.Width - knowWidth), py, x + knowWidth + calc.ReviewInDuePercent * (context.BlockSize.Width - knowWidth), py - 1);
 
             row++;
 

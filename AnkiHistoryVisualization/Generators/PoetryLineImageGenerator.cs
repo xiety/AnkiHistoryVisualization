@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 
 namespace AnkiHistoryVisualization;
 
-public partial class PoetryLineImageGenerator(int columns, int fontSize) : BaseImageGenerator<PoetryLineContext>(framesPerDay: 4, colorBackground)
+public partial class PoetryLineImageGenerator(int columns, int fontSize) : BaseImageGenerator<PoetryLineContext>(new() { AddDays = 4, FramesPerDay = 4, ColorBackground = colorBackground })
 {
     private readonly Font font = new("Arial", fontSize, FontStyle.Bold);
 

@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 
 namespace AnkiHistoryVisualization;
 
-public partial class PoetryWordImageGenerator(int columns) : BaseImageGenerator<PoetryWordContext>(framesPerDay: 4, colorBackground)
+public partial class PoetryWordImageGenerator(int columns) : BaseImageGenerator<PoetryWordContext>(new() { AddDays = 4, FramesPerDay = 4, ColorBackground = colorBackground })
 {
     private static readonly Font font = new("Verdana", 9);
 

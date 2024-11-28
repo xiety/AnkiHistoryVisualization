@@ -1,10 +1,19 @@
 ﻿using System.Drawing;
+using System.Globalization;
 
 namespace AnkiHistoryVisualization;
 
-public abstract class BaseImageGenerator<TContext>(int framesPerDay, Color colorBackground)
+public record GenerationParameters
 {
-    private static readonly Font fontTitle = new("Arial", 6);
+    public int AddDays { get; init; } = 0;
+    public int DateOffset { get; init; } = 15;
+    public int FramesPerDay { get; init; } = 4;
+    public Color ColorBackground { get; init; } = Color.Black;
+}
+
+public abstract class BaseImageGenerator<TContext>(GenerationParameters parameters)
+{
+    private static readonly Font fontTitle = new("Arial", 12, FontStyle.Bold);
     private static readonly Brush brushTitle = Brushes.White;
 
     protected abstract TContext CreateContext(Note[] notes);
@@ -13,27 +22,31 @@ public abstract class BaseImageGenerator<TContext>(int framesPerDay, Color color
 
     public virtual IEnumerable<Bitmap> Generate(Note[] notes)
     {
+        CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
+        CultureInfo.CurrentUICulture = CultureInfo.InvariantCulture;
+
         var context = CreateContext(notes);
 
         var imageSize = CalculateImageSize(context);
         imageSize = new(imageSize.Width & ~1, imageSize.Height & ~1);
 
         var (minDate, maxDate) = DeckUtils.GetMinMaxDate(notes);
-        maxDate = DateOnly.FromDateTime(DateTime.Now).AddDays(1);
+        maxDate = DateOnly.FromDateTime(DateTime.Now).AddDays(parameters.AddDays);
 
         foreach (var date in minDate.EnumerateToInclusive(maxDate))
         {
-            foreach (var frameInsideDay in Enumerable.Range(0, framesPerDay))
+            foreach (var frameInsideDay in Enumerable.Range(0, parameters.FramesPerDay))
             {
-                var fraction = frameInsideDay / (float)framesPerDay;
+                var fraction = frameInsideDay / (float)parameters.FramesPerDay;
 
-                using var bitmap = new Bitmap(imageSize.Width, imageSize.Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+                using var bitmap = new Bitmap(imageSize.Width, imageSize.Height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
                 using var g = Graphics.FromImage(bitmap);
 
-                g.Clear(colorBackground);
-                g.DrawString($"{date:yyyy.MM.dd}", fontTitle, brushTitle, 15, 1);
+                g.Clear(parameters.ColorBackground);
 
                 DrawImage(g, notes, context, minDate, date, fraction);
+
+                g.DrawString($"{date:yyyy.MM.dd}", fontTitle, brushTitle, parameters.DateOffset, 1);
 
                 yield return bitmap;
             }
@@ -44,7 +57,6 @@ public abstract class BaseImageGenerator<TContext>(int framesPerDay, Color color
 
     protected CalcResults Calculate(DateOnly minDate, DateOnly date, float fraction, Card card)
     {
-        var revlog = card.Revlogs.FirstOrDefault(a => a.Date == date);
         var revlogPrev = card.Revlogs.LastOrDefault(a => a.Date <= date);
         var revlogNext = card.Revlogs.FirstOrDefault(a => a.Date > date);
 
@@ -60,7 +72,7 @@ public abstract class BaseImageGenerator<TContext>(int framesPerDay, Color color
 
         var lastReviewDays = revlogPrev is not null ? date.DayNumber - revlogPrev.Date.DayNumber : (int?)null;
 
-        return new(revlogPrev?.Ease, lastReviewDays, nextDue, stability, percent, duePercent, reviewInDuePercent, revlogPrev is null);
+        return new(revlogPrev?.Ease, revlogPrevDate, revlogNextDate, lastReviewDays, nextDue, stability, percent, duePercent, reviewInDuePercent, revlogPrev is null);
     }
 
     protected static float CalcPercentToNextReview(DateOnly date, float fraction, DateOnly revlogPrevDate, DateOnly revlogNextDate)
@@ -81,4 +93,14 @@ public abstract class BaseImageGenerator<TContext>(int framesPerDay, Color color
     }
 }
 
-public record CalcResults(int? LastReview, int? LastReviewDays, DateOnly? DueDate, int Stability, float Percent, float DuePercent, float ReviewInDuePercent, bool IsNew);
+public record CalcResults(
+    int? LastReview,
+    DateOnly RevlogPrevDate,
+    DateOnly RevlogNextDate,
+    int? LastReviewDays,
+    DateOnly? DueDate,
+    int Stability,
+    float Percent,
+    float DuePercent,
+    float ReviewInDuePercent,
+    bool IsNew);

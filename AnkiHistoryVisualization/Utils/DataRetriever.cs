@@ -16,7 +16,7 @@ public static class DataRetriever
         var col = db.Col.First();
 
         Expression<Func<CardTable, bool>> filter = a => a.Deck.Name.StartsWith(deckName) && a.Deck.Name.EndsWith(deckName)
-                                                     && a.Queue != 0 && a.Queue != -1
+                                                     && (a.Queue == 1 || a.Queue == 2 || a.Queue == -2) //TODO: learning, review, buried
                                                      && a.Data != "{}"
                                                      && (cardType == null || a.Ord == cardType);
 
@@ -34,7 +34,7 @@ public static class DataRetriever
 
         var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
 
-        var data = notes.Take(1)
+        var data = notes
             .Select(note =>
             {
                 var fields = note.Flds.Split("\u001f");
@@ -43,7 +43,12 @@ public static class DataRetriever
 
                 var cards = note.Cards.Select(card =>
                 {
-                    var due = DateOnly.FromDateTime(col.Crt.AddDays(card.Due));
+                    var due = card.Queue switch
+                    {
+                        1 => DateOnly.FromDayNumber(card.Due / 86400),
+                        -2 or 2 => DateOnly.FromDateTime(col.Crt.AddDays(card.Due)),
+                        _ => throw new Exception()
+                    };
 
                     var data = JsonSerializer.Deserialize<DataInfo>(card.Data, jsonOptions)!;
                     var difficulty = (data.D - 1.0f) / 9.0f;

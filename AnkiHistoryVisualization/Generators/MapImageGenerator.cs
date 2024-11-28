@@ -4,7 +4,7 @@ using System.Xml.Linq;
 
 namespace AnkiHistoryVisualization;
 
-public class MapImageGenerator(MapRegion[] regions) : BaseImageGenerator<MapContext>(framesPerDay: 3, colorBackground)
+public class MapImageGenerator(MapRegion[] regions) : BaseImageGenerator<MapContext>(new() { AddDays = 4, FramesPerDay = 3, ColorBackground = colorBackground })
 {
     private static readonly Font font = new("Verdana", 9);
 

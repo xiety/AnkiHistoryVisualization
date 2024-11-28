@@ -5,18 +5,27 @@ using FFMpegCore;
 using FFMpegCore.Enums;
 using FFMpegCore.Pipes;
 
+using FFMpegCore.Extensions.System.Drawing.Common;
+
 namespace AnkiHistoryVisualization;
 
 public static class VideoRenderer
 {
     public static void ToVideo(string videoFile, float fps, IEnumerable<Bitmap> images)
     {
+        var videoFramesSource = new RawVideoPipeSource(
+            images.Select(bitmap => new BitmapVideoFrameWrapper(bitmap)))
+        {
+            FrameRate = fps
+        };
+
         var settings = FFMpegArguments
-                    .FromPipeInput(new ImageSequencePipeSource(images, fps))
+                    .FromPipeInput(videoFramesSource)
                     .OutputToFile(videoFile, true, options => options
                         .WithVideoCodec(VideoCodec.LibX265)
                         .ForcePixelFormat("yuv420p")
-                        .WithConstantRateFactor(0)
+                        .WithConstantRateFactor(24)
+                        .WithFramerate(fps)
                         .WithFastStart());
 
         settings.ProcessSynchronously();
@@ -33,21 +42,6 @@ public static class VideoRenderer
         {
             image.Save(Path.Combine(folder, $"{imageIndex:00000}.png"), ImageFormat.Png);
             imageIndex++;
-        }
-    }
-}
-
-file sealed class ImageSequencePipeSource(IEnumerable<Bitmap> images, float fps) : IPipeSource
-{
-    public string GetStreamArguments()
-        => FormattableString.Invariant($"-f image2pipe -r {fps:0.00}");
-
-    public async Task WriteAsync(Stream outputStream, CancellationToken cancellationToken)
-    {
-        foreach (var image in images)
-        {
-            image.Save(outputStream, ImageFormat.Png);
-            await outputStream.FlushAsync(cancellationToken);
         }
     }
 }

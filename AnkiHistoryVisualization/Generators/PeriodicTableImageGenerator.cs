@@ -2,7 +2,7 @@
 
 namespace AnkiHistoryVisualization;
 
-public class PeriodicTableImagesGenerator(Position[] positions) : BaseImageGenerator<object?>(framesPerDay: 4, colorBackground)
+public class PeriodicTableImageGenerator(Position[] positions) : BaseImageGenerator<object?>(new() { AddDays = 4, FramesPerDay = 4, ColorBackground = colorBackground, DateOffset = 50 })
 {
     private static readonly Font fontNumber = new("Verdana", 8, FontStyle.Bold);
     private static readonly Font fontName = new("Verdana", 8, FontStyle.Bold);
@@ -18,8 +18,8 @@ public class PeriodicTableImagesGenerator(Position[] positions) : BaseImageGener
     private static readonly Pen penBorder = Pens.White;
     private static readonly Pen penOutline = new(colorCell, 2);
 
-    private const int requiredStability = 90;
-    private const int offsetY = 14;
+    private const int requiredStability = 365;
+    private const int offsetY = 1;
     private const int margin = 2;
     private const int boxSize = 30;
     private const int bottomGap = 10;
@@ -61,10 +61,14 @@ public class PeriodicTableImagesGenerator(Position[] positions) : BaseImageGener
                     DrawReview(g, cell, fraction, calc);
                     DrawBox(g, x, y, pos.Number, pos.Name);
                 }
+                else
+                {
+                    g.FillRectangle(new SolidBrush(colorCell), cell);
+                }
             }
             else
             {
-                // not yet studied elements
+                // elements without reviews
                 g.FillRectangle(new SolidBrush(colorCell), cell);
             }
         }
